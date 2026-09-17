@@ -142,6 +142,28 @@ class Decoder_fusion(nn.Module):
         out = self.conv_last(out)
         return out
 
+"""
+Simple detection head for predicting objectness, bounding boxes, and class scores from feature maps.
+Contains two, 3x3 convolutional layers with ReLU activation, followed by a final 1x1 convolutional 
+layer that outputs the predictions.
+"""
+class DetectionHead(nn.Module):
+    def __init__(self, in_channels, num_classes):
+        super(DetectionHead, self).__init__()
+
+        self.features = nn.Sequential(
+            nn.Conv2d(in_channels, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 128, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True)
+        )
+
+        # objectness + x + y + width + height + class scores
+        self.prediction = nn.Conv2d(128, 5 + num_classes, kernel_size=1)
+
+    def forward(self, x):
+        x = self.features(x)
+        return self.prediction(x)
 
 class Trans_FuseNet(nn.Module):
     def __init__(self, img_size, patch_size, en_out_channels1, out_channels, part_out, train_flag, 
@@ -165,6 +187,7 @@ class Trans_FuseNet(nn.Module):
         self.conv_gra.weight.data = weight.repeat(en_out_channels1, en_out_channels1, 1, 1).float()
 
         self.decoder_fusion = Decoder_fusion(part_out, out_channels, train_flag)
+        self.detection_head = DetectionHead(part_out, num_classes=5)
 
     def forward(self, ir_de, ir_sh, vi_de, vi_sh, shift_flag):
         # based on 32*32, for arbitrary image size
@@ -210,11 +233,18 @@ class Trans_FuseNet(nn.Module):
         # -----------------------------------
         in_put = c_f
         # -----------------------------------
+        # Detections
+        detections = self.detection_head(in_put)
+        # -----------------------------------
         out = self.decoder_fusion(ir_sh, vi_sh, ir_de, vi_de, in_put)
         out = utils.normalize_tensor(out)
         out = out * 255
         # -----------------------------------
-        outputs = {'out': out}
+        outputs = {
+            'out': out,
+            'fused_features': in_put,
+            'detections': detections
+        }
 
         return outputs
 
