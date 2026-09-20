@@ -55,7 +55,7 @@ def load_encoder(modality, device="cpu"):
             CROSSFUSE_ROOT
             / "models"
             / "autoencoder"
-            / f"auto_encoder_epoch_4_{modality}.model"
+            / f"auto_encoder_epoch_4_ir.model"
         )
     else:  # for PACE, we refer to visible information as "RGB" information, so we need to adjust accordingly
         weights_path = (
