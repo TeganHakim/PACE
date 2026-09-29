@@ -11,7 +11,7 @@ import torch.nn as nn
 import numpy as np
 import cv2
 from os import listdir
-from os.path import join
+from os.path import join, isdir
 import seaborn as sns
 import logging
 import math
@@ -20,6 +20,39 @@ from args_trans import Args as args
 
 EPSILON = 1e-6
 
+
+from os.path import join, isdir   # add isdir to your existing import
+
+IMG_EXTS = ('.png', '.jpg', '.jpeg', '.bmp', '.tif')
+
+
+def list_dronevehicle_images(root, modality, splits=("train",), num=None):
+    """
+    List image paths from VisDrone-DroneVehicle.
+
+    Layout:
+        root/{split}/{split}img/    rgb (modality="rgb")
+        root/{split}/{split}imgr/   infrared (modality="ir")
+    """
+    if modality not in ("rgb", "ir"):
+        raise ValueError(f"modality must be 'rgb' or 'ir', got {modality!r}")
+
+    suffix = "r" if modality == "ir" else ""
+    images = []
+
+    for split in splits:
+        folder = join(root, split, split + "img" + suffix)
+        if not isdir(folder):
+            raise FileNotFoundError(f"Missing folder: {folder}")
+
+        for file in sorted(listdir(folder)):
+            if file.lower().endswith(IMG_EXTS):
+                images.append(join(folder, file))
+
+    if num is not None:
+        images = images[:num]
+
+    return images
 
 def list_images_datasets(directory, num):
     images = []
@@ -270,7 +303,7 @@ def crop_op(img, c_h, c_w):
 
 
 # load images
-def get_image(path, height=256, width=256, flag=False):
+def get_image(path, height=256, width=256, flag=False, border=0):
     if flag is True:
         mode = cv2.IMREAD_COLOR
     else:
@@ -279,6 +312,8 @@ def get_image(path, height=256, width=256, flag=False):
     # -----------------------------------------------------
     assert image is not None, \
         f"The type of image ({path}) is None."
+    if border > 0:
+        image = image[border:-border, border:-border]
     # -----------------------------------------------------
     if height is not None and width is not None:
         image = cv2.resize(image, (height, width))
@@ -286,12 +321,12 @@ def get_image(path, height=256, width=256, flag=False):
 
 
 # get training images
-def get_train_images(paths, height=256, width=256, flag=False):
+def get_train_images(paths, height=256, width=256, flag=False, border=0):
     if isinstance(paths, str):
         paths = [paths]
     images = []
     for path in paths:
-        image = get_image(path, height, width, flag)
+        image = get_image(path, height, width, flag, border)
         if flag is True:
             image = np.transpose(image, (2, 0, 1))
         else:

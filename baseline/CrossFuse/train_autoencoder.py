@@ -24,7 +24,8 @@ from network.net_autoencoder import Auto_Encoder_single
 
 from args_auto import Args as args
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+BORDER_PIXELS = 100
+
 # -------------------------------------------------------
 # Auto-Encoder
 custom_config_auto = {
@@ -39,10 +40,9 @@ custom_config_auto = {
 }
 
 # -------------------------------------------------------
-def load_data(path, train_num):
+def load_data(root, modality, splits, train_num):
 	# train_num for KAIST
-	imgs_path, _ = utils.list_images_datasets(path, train_num)
-	# imgs_path = imgs_path[:train_num]
+	imgs_path = utils.list_dronevehicle_images(root, modality, splits, train_num)
 	random.shuffle(imgs_path)
 	return imgs_path
 
@@ -52,6 +52,13 @@ def train(data, img_flag):
 	batch_size = args.batch
 	step = args.step
 	
+	# fall back to CPU if CUDA is off or unavailable
+	use_cuda = args.cuda and torch.cuda.is_available()
+	if args.cuda and not use_cuda:
+		print('args.cuda is True but CUDA is not available, using CPU.')
+	device = torch.device('cuda' if use_cuda else 'cpu')
+	print('Training on {}'.format(device))
+
 	# auto-encoder
 	model = Auto_Encoder_single(**custom_config_auto)
 	# model = torch.nn.DataParallel(model, list(range(torch.cuda.device_count()))).cuda()
@@ -67,8 +74,7 @@ def train(data, img_flag):
 	# visdom
 	# viz = Visdom()
 	
-	if args.cuda:
-		model.cuda()
+	model.to(device)
 
 	print('Start training.....')
 	
@@ -95,21 +101,16 @@ def train(data, img_flag):
 		for idx in range(batch_num):
 			
 			image_paths = img_paths[idx * batch_size:(idx * batch_size + batch_size)]
-			img = utils.get_train_images(image_paths, height=args.Height, width=args.Width, flag=img_flag)
+			img = utils.get_train_images(image_paths, height=args.Height, width=args.Width,
+                             			flag=img_flag, border=BORDER_PIXELS)
 			
 			count += 1
 			optimizer.zero_grad()
-			batch = Variable(img, requires_grad=False)
-			
-			if args.cuda:
-				batch = batch.cuda()
+			batch = Variable(img, requires_grad=False).to(device)
 			
 			# for DataParallel
 			outputs = model.train_module(batch)
 			
-			img_out = outputs['out']
-			recon_loss = outputs['recon_loss']
-			ssim_loss = outputs['ssim_loss']
 			total_loss = outputs['total_loss']
 			loss_mat.append(total_loss.item())
 			total_loss.backward()
@@ -166,7 +167,7 @@ def train(data, img_flag):
 		# 	print('Done. Testing image data on epoch {}'.format(e + 1))
 		
 		# save loss
-		save_model_filename = 'loss_data_trans_e%d.mat' % (e)
+		save_model_filename = 'loss_data_%s_e%d.mat' % (args.type_flag, e)
 		loss_filename_path = os.path.join(temp_path_loss, save_model_filename)
 		scio.savemat(loss_filename_path, {'loss_data': loss_mat})
 		# save model
@@ -177,12 +178,43 @@ def train(data, img_flag):
 		torch.save(model.state_dict(), save_model_path)
 		##############
 		model.train()
-		model.cuda()
+		model.to(device)
 		print("\nCheckpoint, trained model saved at: " + save_model_path)
 	
 	print("\nDone, TransFuse training phase.")
 
+"""
+Train a single-modality auto-encoder (visible or infrared) for CrossFuse
+on the VisDrone-DroneVehicle dataset.
 
+Run one modality at a time, from baseline/CrossFuse so that the `tools`,
+`network` and `args_auto` imports resolve:
+
+    cd baseline/CrossFuse
+    python train_autoencoder.py
+
+The script takes no command-line arguments. Edit args_auto.py before
+each run:
+
+    path        Dataset root, e.g. "../../VisDrone-DroneVehicle"
+                (a string, relative to the directory you run from)
+    type_flag   "rgb" for rgb or "ir" for infrared. 
+    channel     1 (grayscale). The model is built with in_channels=1.
+    train_num   Max number of images to use, or None for all
+    Height,     Resize target. 256 x 256 matches the paper.
+    Width       None keeps the (cropped) original size.
+    batch, epochs, lr, step, cuda, resume_model_auto, save_auto_model
+
+Outputs, written under args.save_auto_model:
+
+    auto_encoder_epoch_<N>_<type_flag>.model    checkpoint after each epoch
+    loss/loss_data_<type_flag>_e<N>.mat         running loss per epoch
+
+Notes:
+    - Set resume_model_auto to a checkpoint path to continue training.
+    - If you train on cropped images (BORDER_PIXELS > 0), use the same
+      crop at inference.
+"""
 if __name__ == "__main__":
 	# True - RGB, False - gray
 	if args.channel == 1:
@@ -192,7 +224,6 @@ if __name__ == "__main__":
 	
 	path = args.path
 	train_num = args.train_num
-	data = load_data(path, train_num)
+	data = load_data(args.path, args.type_flag, ("train",), args.train_num)
 	
 	train(data, img_flag)
-

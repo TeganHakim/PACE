@@ -10,16 +10,15 @@
 
 class Args():
 	# For training
-	path = ['G:/datasets/Image-fusion/KAIST/lwir/'] # for type_flag = 'ir'
-	# path = ['/data/Disk_B/KAIST-RGBIR/visible/'] # for type_flag = 'vi'
-	type_flag = 'ir' # or 'vi'
+	path = "../../VisDrone-DroneVehicle" 
+	type_flag = 'rgb' # 'ir' or 'rgb'
 	cuda = True
 	lr = 0.0001
 	epochs = 4
 	batch = 2
-	step = 10
+	step = 100
 	w = [1.0, 10000.0, 0.1, 1.0]
-	train_num = 40000
+	train_num = None
 	# Network Parameters
 	channel = 1
 	Height = 256
