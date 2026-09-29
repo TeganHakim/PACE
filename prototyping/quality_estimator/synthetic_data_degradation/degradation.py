@@ -1,7 +1,7 @@
 """
-Key degradation utility script. 
+Synthetic camera and sensor degradation utilities.
 
-Goal: take an image and return a degraded image plus metadata describing exactly what was done.
+Goal: take an image and return a realistically degraded image plus metadata describing exactly what was done.
 """
 
 import cv2
@@ -9,38 +9,52 @@ import numpy as np
 import random
 
 
-def generate_mask(height, width):
+def generate_mask(height, width, num_regions=None):
     """
-    Generate a random spatial region independent of the 8x8 feature grid.
+    Generate a binary mask containing multiple independent degradation
+    regions.
     """
-    mask = np.zeros((height, width), dtype=np.float32)
+    mask = np.zeros((height, width), dtype=np.uint8)
 
-    # Random ellipse
-    cx = random.randint(0, width - 1)
-    cy = random.randint(0, height - 1)
+    if num_regions is None:
+        num_regions = random.randint(1, 4)
 
-    rx = random.randint(width // 20, width // 4)
-    ry = random.randint(height // 20, height // 4)
+    for _ in range(num_regions):
+        cx = random.randint(0, width - 1)
+        cy = random.randint(0, height - 1)
 
-    cv2.ellipse(
-        mask,
-        (cx, cy),
-        (rx, ry),
-        angle=random.uniform(0, 180),
-        startAngle=0,
-        endAngle=360,
-        color=1.0,
-        thickness=-1
-    )
+        rx = random.randint(
+            max(2, width // 30),
+            max(3, width // 5)
+        )
+        ry = random.randint(
+            max(2, height // 30),
+            max(3, height // 5)
+        )
+
+        points = []
+        num_points = random.randint(8, 14)
+
+        for i in range(num_points):
+            angle = 2 * np.pi * i / num_points
+            radius = random.uniform(0.7, 1.3)
+
+            x = int(cx + rx * radius * np.cos(angle))
+            y = int(cy + ry * radius * np.sin(angle))
+
+            points.append([x, y])
+
+        points = np.array(points, dtype=np.int32)
+        cv2.fillPoly(mask, [points], 1)
 
     return mask
 
 
-def apply_blur(image, mask, severity):
+def apply_water_blur(image, mask, severity):
     """
-    severity: [0, 1]
+    Simulate water droplets, condensation, or a dirty camera lens.
     """
-    sigma = 0.5 + severity * 5.0
+    sigma = 0.5 + severity * 7.0
 
     blurred = cv2.GaussianBlur(
         image,
@@ -49,64 +63,167 @@ def apply_blur(image, mask, severity):
     )
 
     mask = mask[..., None]
+
     return image * (1 - mask) + blurred * mask
 
 
-def apply_noise(image, mask, severity):
-    sigma = severity * 40
+def apply_motion_blur(image, mask, severity):
+    """
+    Simulate camera motion during image capture.
+    """
+    size = int(3 + severity * 18)
+    size = size if size % 2 == 1 else size + 1
 
+    kernel = np.zeros((size, size), dtype=np.float32)
+    kernel[size // 2, :] = 1.0 / size
+
+    blurred = cv2.filter2D(image, -1, kernel)
+
+    mask = mask[..., None]
+
+    return image * (1 - mask) + blurred * mask
+
+def apply_sensor_noise(image, mask, severity):
+    """
+    Simulate highly disruptive electronic sensor noise.
+    Includes high-variance Gaussian noise, line striping, and dead/stuck pixels.
+    Works with RGB and single-channel IR images.
+    """
+    
+    sigma = severity * 60.0
     noise = np.random.normal(0, sigma, image.shape)
-    noisy = np.clip(image + noise, 0, 255)
+    
+    noisy = image.astype(np.float32) + noise
+    
+    h, _ = image.shape[:2]
+    num_corrupted_lines = int(severity * (h // 10))
+    if num_corrupted_lines > 0:
+        corrupted_rows = np.random.choice(h, num_corrupted_lines, replace=False)
+        
+        line_offsets = np.random.uniform(-100, 100, size=(num_corrupted_lines, 1))
+        if len(image.shape) == 3:
+            line_offsets = np.expand_dims(line_offsets, axis=-1)
+        noisy[corrupted_rows, :] += line_offsets
+
+    # Salt and Pepper noise
+    sp_ratio = severity * 0.08
+    random_matrix = np.random.random(image.shape[:2])
+    
+    salt_mask = random_matrix < (sp_ratio / 2)
+    noisy[salt_mask] = 255
+
+    pepper_mask = (random_matrix >= (sp_ratio / 2)) & (random_matrix < sp_ratio)
+    noisy[pepper_mask] = 0
+
+    noisy = np.clip(noisy, 0, 255).astype(np.uint8)
+
+    if len(image.shape) == 3 and len(mask.shape) == 2:
+        mask = mask[..., None]
+
+    return (image * (1 - mask) + noisy * mask).astype(np.uint8)
+
+
+def apply_saturation(image, mask, severity):
+    """
+    Simulate localized sensor saturation or overexposure.
+    """
+    output = image.astype(np.float32)
+
+    amount = 0.3 + 0.7 * severity
+
+    saturated = output + (
+        (255.0 - output) * amount
+    )
+
+    saturated = np.clip(
+        saturated,
+        0,
+        255
+    )
 
     mask = mask[..., None]
-    return image * (1 - mask) + noisy * mask
+
+    return output * (1 - mask) + saturated * mask
 
 
-def apply_contrast_loss(image, mask, severity):
-    # severity 0 -> original contrast
-    # severity 1 -> very low contrast
-    alpha = 1.0 - 0.8 * severity
-
-    mean = image.mean(axis=(0, 1), keepdims=True)
-    low_contrast = mean + alpha * (image - mean)
-    low_contrast = np.clip(low_contrast, 0, 255)
-
-    mask = mask[..., None]
-    return image * (1 - mask) + low_contrast * mask
-
-
-def apply_degradation(image, degradation_type=None):
+def apply_degradation(
+    image,
+    degradation_type=None,
+    severity=None
+):
     """
     Main entry point.
 
-    Returns:
-        degraded_image
-        metadata
-    """
+    Args:
+        image: RGB or IR image as a NumPy array.
+        degradation_type: Type of degradation to apply. If None,
+            one is selected randomly.
+        severity: Degradation severity in the range [0, 1].
+            If None, a random severity is selected.
 
-    h, w = image.shape[:2]
+    Returns:
+        degraded_image: Degraded image as uint8.
+        metadata: Dictionary describing the degradation.
+    """
+    if image is None:
+        raise ValueError("Input image cannot be None.")
+
+    if image.dtype != np.uint8:
+        image = np.clip(
+            image,
+            0,
+            255
+        ).astype(np.uint8)
+
+    height, width = image.shape[:2]
+
+    degradation_types = [
+        "water_blur",
+        "motion_blur",
+        "sensor_noise",
+        "saturation"
+    ]
 
     if degradation_type is None:
-        degradation_type = random.choice([
-            "blur",
-            "noise",
-            "contrast"
-        ])
+        degradation_type = random.choice(degradation_types)
 
-    severity = random.uniform(0.2, 1.0)
-    mask = generate_mask(h, w)
+    if severity is None:
+        severity = random.uniform(0.2, 1.0)
 
-    if degradation_type == "blur":
-        output = apply_blur(image, mask, severity)
+    mask = generate_mask(height,width)
 
-    elif degradation_type == "noise":
-        output = apply_noise(image, mask, severity)
+    if degradation_type == "water_blur":
+        output = apply_water_blur(
+            image,
+            mask,
+            severity
+        )
 
-    elif degradation_type == "contrast":
-        output = apply_contrast_loss(image, mask, severity)
+    elif degradation_type == "motion_blur":
+        output = apply_motion_blur(
+            image,
+            mask,
+            severity
+        )
+
+    elif degradation_type == "sensor_noise":
+        output = apply_sensor_noise(
+            image,
+            mask,
+            severity
+        )
+
+    elif degradation_type == "saturation":
+        output = apply_saturation(
+            image,
+            mask,
+            severity
+        )
 
     else:
-        raise ValueError(f"Unknown degradation: {degradation_type}")
+        raise ValueError(
+            f"Unknown degradation: {degradation_type}"
+        )
 
     metadata = {
         "type": degradation_type,
@@ -114,4 +231,7 @@ def apply_degradation(image, degradation_type=None):
         "mask": mask
     }
 
-    return output.astype(np.uint8), metadata
+    return (
+        np.clip(output, 0, 255).astype(np.uint8),
+        metadata
+    )
