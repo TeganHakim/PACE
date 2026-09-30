@@ -14,11 +14,13 @@ For every synchronized RGB/IR pair:
 8. Save cropped images, adjusted annotations, labels, and metadata.
 
 Important:
+
     "degraded=True" means a meaningful degradation was actually applied,
     not merely that the sample was selected for a degradation attempt.
 """
 
 import csv
+import pickle
 import random
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -63,6 +65,9 @@ DEGRADATION_TYPES = [
     "saturation",
 ]
 
+# Save a checkpoint every N successfully processed samples.
+CHECKPOINT_EVERY = 100
+
 
 # ------------------------------------------------------------------
 # Dataset paths
@@ -76,34 +81,126 @@ OUTPUT_ROOT = Path(
     "processed_dataset"
 )
 
-RGB_DIR = (
-    DATASET_ROOT /
-    "train" /
-    "trainimg"
+METADATA_PATH = (
+    OUTPUT_ROOT /
+    "metadata.csv"
 )
 
-IR_DIR = (
-    DATASET_ROOT /
-    "train" /
-    "trainimgr"
+CHECKPOINT_PATH = (
+    OUTPUT_ROOT /
+    "build_checkpoint.pkl"
 )
 
-RGB_XML_DIR = (
-    DATASET_ROOT /
-    "train" /
-    "trainlabel"
-)
-
-IR_XML_DIR = (
-    DATASET_ROOT /
-    "train" /
-    "trainlabelr"
+BUILD_COMPLETE_PATH = (
+    OUTPUT_ROOT /
+    "BUILD_COMPLETE.txt"
 )
 
 
-# Keep small while validating.
-# Set to None for the full training set.
-MAX_SAMPLES = 500
+SPLIT_CONFIGS = {
+    "train": {
+        "rgb":
+            DATASET_ROOT /
+            "train" /
+            "trainimg",
+
+        "ir":
+            DATASET_ROOT /
+            "train" /
+            "trainimgr",
+
+        "rgb_xml":
+            DATASET_ROOT /
+            "train" /
+            "trainlabel",
+
+        "ir_xml":
+            DATASET_ROOT /
+            "train" /
+            "trainlabelr",
+    },
+
+    "val": {
+        "rgb":
+            DATASET_ROOT /
+            "val" /
+            "valimg",
+
+        "ir":
+            DATASET_ROOT /
+            "val" /
+            "valimgr",
+
+        "rgb_xml":
+            DATASET_ROOT /
+            "val" /
+            "vallabel",
+
+        "ir_xml":
+            DATASET_ROOT /
+            "val" /
+            "vallabelr",
+    },
+
+    "test": {
+        "rgb":
+            DATASET_ROOT /
+            "test" /
+            "testimg",
+
+        "ir":
+            DATASET_ROOT /
+            "test" /
+            "testimgr",
+
+        "rgb_xml":
+            DATASET_ROOT /
+            "test" /
+            "testlabel",
+
+        "ir_xml":
+            DATASET_ROOT /
+            "test" /
+            "testlabelr",
+    },
+}
+
+
+# This limit is applied PER SPLIT.
+#
+# Example:
+#     MAX_SAMPLES = 2
+#
+# gives:
+#     2 train
+#     2 val
+#     2 test
+#
+# Use None for the complete dataset.
+MAX_SAMPLES = 200
+
+
+# ------------------------------------------------------------------
+# Metadata fields
+# ------------------------------------------------------------------
+
+METADATA_FIELDS = [
+    "pair_id",
+    "split",
+    "rgb_path",
+    "ir_path",
+    "rgb_xml",
+    "ir_xml",
+    "rgb_quality",
+    "ir_quality",
+    "degraded",
+    "modality",
+    "degradation_type",
+    "severity",
+    "source_rgb",
+    "source_ir",
+    "seed",
+]
 
 
 # ------------------------------------------------------------------
@@ -117,6 +214,233 @@ def set_random_seed(seed):
 
     random.seed(seed)
     np.random.seed(seed)
+
+
+# ------------------------------------------------------------------
+# Checkpoint / resume utilities
+# ------------------------------------------------------------------
+
+def save_checkpoint(
+    split,
+    next_index,
+    completed_count
+):
+    """
+    Save enough state to resume the build deterministically.
+
+    next_index is the zero-based index of the NEXT sample that should
+    be processed within the current split.
+
+    Random states are saved so that a resumed run produces exactly the
+    same future random decisions as an uninterrupted run.
+    """
+
+    checkpoint = {
+        "split": split,
+        "next_index": next_index,
+        "completed_count": completed_count,
+        "python_random_state":
+            random.getstate(),
+        "numpy_random_state":
+            np.random.get_state(),
+    }
+
+    temporary_path = (
+        CHECKPOINT_PATH.with_suffix(
+            ".tmp"
+        )
+    )
+
+    with open(
+        temporary_path,
+        "wb"
+    ) as checkpoint_file:
+
+        pickle.dump(
+            checkpoint,
+            checkpoint_file
+        )
+
+    temporary_path.replace(
+        CHECKPOINT_PATH
+    )
+
+
+def load_checkpoint():
+    """
+    Load an existing build checkpoint.
+
+    Returns None when no checkpoint exists.
+    """
+
+    if not CHECKPOINT_PATH.exists():
+        return None
+
+    with open(
+        CHECKPOINT_PATH,
+        "rb"
+    ) as checkpoint_file:
+
+        checkpoint = pickle.load(
+            checkpoint_file
+        )
+
+    return checkpoint
+
+
+def restore_random_state(
+    checkpoint
+):
+    """
+    Restore Python and NumPy RNG states from a checkpoint.
+    """
+
+    random.setstate(
+        checkpoint[
+            "python_random_state"
+        ]
+    )
+
+    np.random.set_state(
+        checkpoint[
+            "numpy_random_state"
+        ]
+    )
+
+
+def clear_checkpoint():
+    """
+    Remove active checkpoint after a successful full build.
+    """
+
+    if CHECKPOINT_PATH.exists():
+        CHECKPOINT_PATH.unlink()
+
+
+# ------------------------------------------------------------------
+# Metadata utilities
+# ------------------------------------------------------------------
+
+def initialize_metadata_file():
+    """
+    Create a fresh metadata CSV and write its header.
+    """
+
+    OUTPUT_ROOT.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    with open(
+        METADATA_PATH,
+        "w",
+        newline=""
+    ) as csv_file:
+
+        writer = csv.DictWriter(
+            csv_file,
+            fieldnames=METADATA_FIELDS
+        )
+
+        writer.writeheader()
+
+
+def append_metadata_row(row):
+    """
+    Append one successfully completed sample to metadata.csv.
+
+    The row is written immediately so a crash does not discard all
+    previously generated metadata.
+    """
+
+    with open(
+        METADATA_PATH,
+        "a",
+        newline=""
+    ) as csv_file:
+
+        writer = csv.DictWriter(
+            csv_file,
+            fieldnames=METADATA_FIELDS
+        )
+
+        writer.writerow(row)
+
+
+def read_metadata():
+    """
+    Read existing metadata rows.
+    """
+
+    if not METADATA_PATH.exists():
+        return []
+
+    with open(
+        METADATA_PATH,
+        "r",
+        newline=""
+    ) as csv_file:
+
+        reader = csv.DictReader(
+            csv_file
+        )
+
+        return list(reader)
+
+
+def metadata_key(row):
+    """
+    Unique sample key across train/val/test.
+    """
+
+    return (
+        row["split"],
+        row["pair_id"]
+    )
+
+
+def trim_metadata_to_checkpoint(
+    checkpoint
+):
+    """
+    Remove metadata rows written after the most recent checkpoint.
+
+    A crash may occur after one or more metadata rows were written but
+    before the next checkpoint was saved. Those samples will be replayed
+    from the checkpoint, so their old metadata rows must first be removed
+    to avoid duplicates.
+    """
+
+    if not METADATA_PATH.exists():
+        return
+
+    rows = read_metadata()
+
+    keep_count = checkpoint[
+        "completed_count"
+    ]
+
+    if len(rows) <= keep_count:
+        return
+
+    rows = rows[:keep_count]
+
+    with open(
+        METADATA_PATH,
+        "w",
+        newline=""
+    ) as csv_file:
+
+        writer = csv.DictWriter(
+            csv_file,
+            fieldnames=METADATA_FIELDS
+        )
+
+        writer.writeheader()
+
+        writer.writerows(
+            rows
+        )
 
 
 # ------------------------------------------------------------------
@@ -154,8 +478,11 @@ def apply_crop(
         )
 
     return image[
-        border_pixels:height - border_pixels,
-        border_pixels:width - border_pixels
+        border_pixels:
+        height - border_pixels,
+
+        border_pixels:
+        width - border_pixels
     ]
 
 
@@ -270,7 +597,6 @@ def adjust_xml_for_crop(
             continue
 
         points = []
-
         valid_polygon = True
 
         for i in range(1, 5):
@@ -402,10 +728,12 @@ def create_output_directories(
 
     directories = {
         "rgb":
-            output_root / "rgb",
+            output_root /
+            "rgb",
 
         "ir":
-            output_root / "ir",
+            output_root /
+            "ir",
 
         "rgb_annotations":
             output_root /
@@ -462,9 +790,8 @@ def is_meaningful_degradation(
         min_fraction
     )
 
-
 # ------------------------------------------------------------------
-# Process one synchronized pair
+# Process one synchronized RGB / IR pair
 # ------------------------------------------------------------------
 
 def process_pair(
@@ -478,312 +805,73 @@ def process_pair(
 ):
     """
     Process one synchronized RGB/IR pair.
+
+    Returns
+    -------
+    dict
+        One metadata row describing the generated sample.
     """
 
     # --------------------------------------------------------------
-    # Load original padded images
+    # Load original images
     # --------------------------------------------------------------
 
-    rgb = cv2.imread(
+    rgb_original = cv2.imread(
         str(rgb_path),
         cv2.IMREAD_COLOR
     )
 
-    ir = cv2.imread(
+    ir_original = cv2.imread(
         str(ir_path),
         cv2.IMREAD_UNCHANGED
     )
 
-    if rgb is None:
+    if rgb_original is None:
         raise ValueError(
             f"Could not load RGB image: "
             f"{rgb_path}"
         )
 
-    if ir is None:
+    if ir_original is None:
         raise ValueError(
             f"Could not load IR image: "
             f"{ir_path}"
         )
 
-    # --------------------------------------------------------------
-    # Record original dimensions for XML adjustment
-    # --------------------------------------------------------------
-
     rgb_original_height, rgb_original_width = (
-        rgb.shape[:2]
+        rgb_original.shape[:2]
     )
 
     ir_original_height, ir_original_width = (
-        ir.shape[:2]
+        ir_original.shape[:2]
     )
 
     # --------------------------------------------------------------
-    # Remove fixed padding BEFORE all quality/degradation work
+    # Crop fixed DroneVehicle padding
     # --------------------------------------------------------------
 
     rgb = apply_crop(
-        rgb
+        rgb_original
     )
 
     ir = apply_crop(
-        ir
+        ir_original
     )
 
-    # --------------------------------------------------------------
-    # Crop sanity checks
-    # --------------------------------------------------------------
-
-    expected_rgb_shape = (
-        rgb_original_height -
-        2 * BORDER_PIXELS,
-        rgb_original_width -
-        2 * BORDER_PIXELS
-    )
-
-    expected_ir_shape = (
-        ir_original_height -
-        2 * BORDER_PIXELS,
-        ir_original_width -
-        2 * BORDER_PIXELS
-    )
-
-    if rgb.shape[:2] != expected_rgb_shape:
-
+    # RGB and IR should remain spatially synchronized.
+    if (
+        rgb.shape[:2] !=
+        ir.shape[:2]
+    ):
         raise ValueError(
-            f"Unexpected RGB crop for "
-            f"{pair_id}: "
-            f"{rgb.shape[:2]} vs "
-            f"{expected_rgb_shape}"
+            f"RGB/IR spatial mismatch for "
+            f"{split}/{pair_id}: "
+            f"RGB={rgb.shape[:2]}, "
+            f"IR={ir.shape[:2]}"
         )
 
-    if ir.shape[:2] != expected_ir_shape:
-
-        raise ValueError(
-            f"Unexpected IR crop for "
-            f"{pair_id}: "
-            f"{ir.shape[:2]} vs "
-            f"{expected_ir_shape}"
-        )
-
-    # --------------------------------------------------------------
-    # Baseline quality
-    # --------------------------------------------------------------
-
-    (
-        rgb_quality,
-        sufficient_light_mask,
-        _
-    ) = compute_rgb_baseline_quality(
-        rgb
-    )
-
-    # Clean IR is treated as reference quality.
-    ir_quality = (
-        create_ir_baseline()
-    )
-
-    # --------------------------------------------------------------
-    # Start with clean copies and CLEAN metadata
-    # --------------------------------------------------------------
-
-    output_rgb = rgb.copy()
-    output_ir = ir.copy()
-
-    degraded = False
-    degraded_modality = "none"
-    degradation_type = "none"
-    severity = 0.0
-
-    # --------------------------------------------------------------
-    # Decide whether to ATTEMPT a degradation
-    # --------------------------------------------------------------
-
-    attempt_degradation = (
-        random.random() <
-        DEGRADATION_PROBABILITY
-    )
-
-    if attempt_degradation:
-
-        selected_modality = (
-            random.choice([
-                "rgb",
-                "ir"
-            ])
-        )
-
-        selected_type = (
-            random.choice(
-                DEGRADATION_TYPES
-            )
-        )
-
-        selected_severity = (
-            random.uniform(
-                0.2,
-                1.0
-            )
-        )
-
-        # ----------------------------------------------------------
-        # RGB degradation attempt
-        # ----------------------------------------------------------
-
-        if selected_modality == "rgb":
-
-            random_mask = (
-                generate_mask(
-                    rgb.shape[0],
-                    rgb.shape[1]
-                )
-            )
-
-            # RGB degradation is only meaningful where sufficient
-            # visible-light information exists.
-            effective_mask = (
-                random_mask *
-                sufficient_light_mask
-            ).astype(np.uint8)
-
-            effective_fraction = (
-                mask_fraction(
-                    effective_mask
-                )
-            )
-
-            # ------------------------------------------------------
-            # Only apply + record degradation if enough pixels survive
-            # the lighting constraint.
-            # ------------------------------------------------------
-
-            if is_meaningful_degradation(
-                effective_mask
-            ):
-
-                degraded = True
-                degraded_modality = "rgb"
-                degradation_type = selected_type
-                severity = selected_severity
-
-                output_rgb, _ = (
-                    apply_degradation(
-                        rgb,
-                        degradation_type=(
-                            degradation_type
-                        ),
-                        severity=severity,
-                        mask=effective_mask
-                    )
-                )
-
-                coverage = (
-                    mask_to_coverage(
-                        effective_mask
-                    )
-                )
-
-                rgb_quality = (
-                    compute_final_quality(
-                        rgb_quality,
-                        coverage,
-                        severity
-                    )
-                )
-
-            else:
-
-                print(
-                    f"  RGB degradation skipped for "
-                    f"{pair_id}: effective mask covers "
-                    f"{effective_fraction:.2%} of image "
-                    f"(< {MIN_DEGRADED_FRACTION:.2%})"
-                )
-
-        # ----------------------------------------------------------
-        # IR degradation attempt
-        # ----------------------------------------------------------
-
-        else:
-
-            ir_mask = (
-                generate_mask(
-                    ir.shape[0],
-                    ir.shape[1]
-                )
-            )
-
-            ir_fraction = (
-                mask_fraction(
-                    ir_mask
-                )
-            )
-
-            if is_meaningful_degradation(
-                ir_mask
-            ):
-
-                degraded = True
-                degraded_modality = "ir"
-                degradation_type = selected_type
-                severity = selected_severity
-
-                output_ir, _ = (
-                    apply_degradation(
-                        ir,
-                        degradation_type=(
-                            degradation_type
-                        ),
-                        severity=severity,
-                        mask=ir_mask
-                    )
-                )
-
-                coverage = (
-                    mask_to_coverage(
-                        ir_mask
-                    )
-                )
-
-                ir_quality = (
-                    compute_final_quality(
-                        ir_quality,
-                        coverage,
-                        severity
-                    )
-                )
-
-            else:
-
-                print(
-                    f"  IR degradation skipped for "
-                    f"{pair_id}: mask covers "
-                    f"{ir_fraction:.2%} of image "
-                    f"(< {MIN_DEGRADED_FRACTION:.2%})"
-                )
-
-    # --------------------------------------------------------------
-    # Ensure dimensions never change
-    # --------------------------------------------------------------
-
-    assert (
-        output_rgb.shape ==
-        rgb.shape
-    ), (
-        f"RGB shape changed for "
-        f"{pair_id}: "
-        f"{rgb.shape} -> "
-        f"{output_rgb.shape}"
-    )
-
-    assert (
-        output_ir.shape ==
-        ir.shape
-    ), (
-        f"IR shape changed for "
-        f"{pair_id}: "
-        f"{ir.shape} -> "
-        f"{output_ir.shape}"
+    height, width = (
+        rgb.shape[:2]
     )
 
     # --------------------------------------------------------------
@@ -800,28 +888,28 @@ def process_pair(
         f"{pair_id}.jpg"
     )
 
-    rgb_xml_output = (
+    rgb_xml_output_path = (
         output_dirs[
             "rgb_annotations"
         ] /
         f"{pair_id}.xml"
     )
 
-    ir_xml_output = (
+    ir_xml_output_path = (
         output_dirs[
             "ir_annotations"
         ] /
         f"{pair_id}.xml"
     )
 
-    rgb_quality_path = (
+    rgb_quality_output_path = (
         output_dirs[
             "quality_maps"
         ] /
         f"{pair_id}_rgb.npy"
     )
 
-    ir_quality_path = (
+    ir_quality_output_path = (
         output_dirs[
             "quality_maps"
         ] /
@@ -829,34 +917,351 @@ def process_pair(
     )
 
     # --------------------------------------------------------------
-    # Save images
+    # Adjust XML annotations to cropped coordinate system
+    # --------------------------------------------------------------
+
+    adjust_xml_for_crop(
+        xml_input_path=rgb_xml_path,
+        xml_output_path=(
+            rgb_xml_output_path
+        ),
+        original_width=(
+            rgb_original_width
+        ),
+        original_height=(
+            rgb_original_height
+        )
+    )
+
+    adjust_xml_for_crop(
+        xml_input_path=ir_xml_path,
+        xml_output_path=(
+            ir_xml_output_path
+        ),
+        original_width=(
+            ir_original_width
+        ),
+        original_height=(
+            ir_original_height
+        )
+    )
+
+    # --------------------------------------------------------------
+    # Compute baseline quality
+    # --------------------------------------------------------------
+
+    (
+        rgb_quality,
+        sufficient_light_mask,
+        _
+    ) = compute_rgb_baseline_quality(
+        rgb
+    )
+
+    ir_quality = create_ir_baseline()
+
+    # --------------------------------------------------------------
+    # Default state = clean
+    # --------------------------------------------------------------
+
+    degraded = False
+    modality = "none"
+    degradation_type = "none"
+    severity = 0.0
+
+    rgb_final = rgb.copy()
+    ir_final = ir.copy()
+
+    # --------------------------------------------------------------
+    # Decide whether to ATTEMPT degradation
+    # --------------------------------------------------------------
+
+    attempt_degradation = (
+        random.random()
+        <
+        DEGRADATION_PROBABILITY
+    )
+
+    if attempt_degradation:
+
+        candidate_modality = (
+            random.choice(
+                ["rgb", "ir"]
+            )
+        )
+
+        candidate_type = (
+            random.choice(
+                DEGRADATION_TYPES
+            )
+        )
+
+        candidate_severity = (
+            random.uniform(
+                0.2,
+                1.0
+            )
+        )
+
+        # ----------------------------------------------------------
+        # Generate candidate spatial mask
+        # ----------------------------------------------------------
+
+        candidate_mask = (
+            generate_mask(
+                height,
+                width
+            )
+        )
+
+        # ----------------------------------------------------------
+        # RGB degradation
+        #
+        # RGB degradation should only be applied where RGB already
+        # contains usable visible-light information.
+        # ----------------------------------------------------------
+
+        if candidate_modality == "rgb":
+
+            # Only degrade sufficiently illuminated RGB pixels.
+            effective_mask = (
+                candidate_mask *
+                sufficient_light_mask
+            ).astype(np.uint8)
+
+            effective_fraction = (
+                mask_fraction(
+                    effective_mask
+                )
+            )
+
+            if (
+                effective_fraction
+                >=
+                MIN_DEGRADED_FRACTION
+            ):
+
+                rgb_final, degradation_metadata = (
+                    apply_degradation(
+                        rgb,
+                        degradation_type=(
+                            candidate_type
+                        ),
+                        severity=(
+                            candidate_severity
+                        ),
+                        mask=(
+                            effective_mask
+                        )
+                    )
+                )
+
+                # ----------------------------------------------
+                # Convert degradation mask to 8x8 coverage
+                # ----------------------------------------------
+
+                rgb_coverage = (
+                    mask_to_coverage(
+                        effective_mask
+                    )
+                )
+
+                rgb_quality = (
+                    compute_final_quality(
+                        rgb_quality,
+                        rgb_coverage,
+                        candidate_severity
+                    )
+                )
+
+                degraded = True
+
+                modality = "rgb"
+
+                degradation_type = (
+                    degradation_metadata[
+                        "type"
+                    ]
+                )
+
+                severity = float(
+                    degradation_metadata[
+                        "severity"
+                    ]
+                )
+
+            else:
+
+                print(
+                    f"  RGB degradation skipped "
+                    f"for {pair_id}: "
+                    f"effective mask covers "
+                    f"{effective_fraction:.2%} "
+                    f"of image "
+                    f"(< "
+                    f"{MIN_DEGRADED_FRACTION:.2%})"
+                )
+
+        # ----------------------------------------------------------
+        # IR degradation
+        # ----------------------------------------------------------
+
+        else:
+
+            effective_mask = (
+                candidate_mask
+            )
+
+            effective_fraction = (
+                mask_fraction(
+                    effective_mask
+                )
+            )
+
+            if (
+                effective_fraction
+                >=
+                MIN_DEGRADED_FRACTION
+            ):
+
+                ir_final, degradation_metadata = (
+                    apply_degradation(
+                        ir,
+                        degradation_type=(
+                            candidate_type
+                        ),
+                        severity=(
+                            candidate_severity
+                        ),
+                        mask=(
+                            effective_mask
+                        )
+                    )
+                )
+
+                ir_coverage = (
+                    mask_to_coverage(
+                        effective_mask
+                    )
+                )
+
+                ir_quality = (
+                    compute_final_quality(
+                        ir_quality,
+                        ir_coverage,
+                        candidate_severity
+                    )
+                )
+
+                degraded = True
+
+                modality = "ir"
+
+                degradation_type = (
+                    degradation_metadata[
+                        "type"
+                    ]
+                )
+
+                severity = float(
+                    degradation_metadata[
+                        "severity"
+                    ]
+                )
+
+            else:
+
+                print(
+                    f"  IR degradation skipped "
+                    f"for {pair_id}: "
+                    f"mask covers "
+                    f"{effective_fraction:.2%} "
+                    f"of image "
+                    f"(< "
+                    f"{MIN_DEGRADED_FRACTION:.2%})"
+                )
+
+    # --------------------------------------------------------------
+    # Final quality-map validation
+    # --------------------------------------------------------------
+
+    rgb_quality = np.clip(
+        rgb_quality,
+        0.0,
+        1.0
+    ).astype(np.float32)
+
+    ir_quality = np.clip(
+        ir_quality,
+        0.0,
+        1.0
+    ).astype(np.float32)
+
+    if rgb_quality.shape != (8, 8):
+        raise RuntimeError(
+            f"RGB quality map for "
+            f"{split}/{pair_id} has "
+            f"unexpected shape "
+            f"{rgb_quality.shape}."
+        )
+
+    if ir_quality.shape != (8, 8):
+        raise RuntimeError(
+            f"IR quality map for "
+            f"{split}/{pair_id} has "
+            f"unexpected shape "
+            f"{ir_quality.shape}."
+        )
+
+    if not np.all(
+        np.isfinite(
+            rgb_quality
+        )
+    ):
+        raise RuntimeError(
+            f"RGB quality map for "
+            f"{split}/{pair_id} "
+            f"contains NaN/Inf."
+        )
+
+    if not np.all(
+        np.isfinite(
+            ir_quality
+        )
+    ):
+        raise RuntimeError(
+            f"IR quality map for "
+            f"{split}/{pair_id} "
+            f"contains NaN/Inf."
+        )
+
+    # --------------------------------------------------------------
+    # Save processed images
     # --------------------------------------------------------------
 
     rgb_write_success = (
         cv2.imwrite(
             str(rgb_output_path),
-            output_rgb
+            rgb_final
         )
     )
 
     ir_write_success = (
         cv2.imwrite(
             str(ir_output_path),
-            output_ir
+            ir_final
         )
     )
 
     if not rgb_write_success:
-
         raise IOError(
-            f"Failed to save RGB image: "
+            f"Failed to write RGB image: "
             f"{rgb_output_path}"
         )
 
     if not ir_write_success:
-
         raise IOError(
-            f"Failed to save IR image: "
+            f"Failed to write IR image: "
             f"{ir_output_path}"
         )
 
@@ -865,38 +1270,20 @@ def process_pair(
     # --------------------------------------------------------------
 
     np.save(
-        rgb_quality_path,
+        rgb_quality_output_path,
         rgb_quality
     )
 
     np.save(
-        ir_quality_path,
+        ir_quality_output_path,
         ir_quality
     )
 
     # --------------------------------------------------------------
-    # Save adjusted XML annotations
+    # Construct metadata
     # --------------------------------------------------------------
 
-    adjust_xml_for_crop(
-        rgb_xml_path,
-        rgb_xml_output,
-        rgb_original_width,
-        rgb_original_height
-    )
-
-    adjust_xml_for_crop(
-        ir_xml_path,
-        ir_xml_output,
-        ir_original_width,
-        ir_original_height
-    )
-
-    # --------------------------------------------------------------
-    # Metadata
-    # --------------------------------------------------------------
-
-    return {
+    metadata = {
         "pair_id":
             pair_id,
 
@@ -904,28 +1291,40 @@ def process_pair(
             split,
 
         "rgb_path":
-            str(rgb_output_path),
+            str(
+                rgb_output_path
+            ),
 
         "ir_path":
-            str(ir_output_path),
+            str(
+                ir_output_path
+            ),
 
         "rgb_xml":
-            str(rgb_xml_output),
+            str(
+                rgb_xml_output_path
+            ),
 
         "ir_xml":
-            str(ir_xml_output),
+            str(
+                ir_xml_output_path
+            ),
 
         "rgb_quality":
-            str(rgb_quality_path),
+            str(
+                rgb_quality_output_path
+            ),
 
         "ir_quality":
-            str(ir_quality_path),
+            str(
+                ir_quality_output_path
+            ),
 
         "degraded":
             degraded,
 
         "modality":
-            degraded_modality,
+            modality,
 
         "degradation_type":
             degradation_type,
@@ -934,107 +1333,64 @@ def process_pair(
             severity,
 
         "source_rgb":
-            str(rgb_path),
+            str(
+                rgb_path
+            ),
 
         "source_ir":
-            str(ir_path),
+            str(
+                ir_path
+            ),
 
         "seed":
             RANDOM_SEED,
     }
 
+    return metadata
+
 
 # ------------------------------------------------------------------
-# Metadata
+# Source-dataset validation
 # ------------------------------------------------------------------
 
-def write_metadata(
-    rows,
-    output_path
+def validate_source_directories():
+    """
+    Verify all configured source directories exist before beginning
+    the long dataset-generation run.
+    """
+
+    for split, config in (
+        SPLIT_CONFIGS.items()
+    ):
+
+        for source_type, path in (
+            config.items()
+        ):
+
+            if not path.exists():
+
+                raise FileNotFoundError(
+                    f"Missing {split} "
+                    f"{source_type} "
+                    f"directory: {path}"
+                )
+
+
+# ------------------------------------------------------------------
+# Get synchronized RGB candidates for a split
+# ------------------------------------------------------------------
+
+def get_rgb_paths(
+    split_config
 ):
     """
-    Write metadata.csv.
+    Return sorted RGB image paths for one split.
     """
 
-    if not rows:
-
-        raise ValueError(
-            "No metadata rows were generated."
-        )
-
-    with open(
-        output_path,
-        "w",
-        newline=""
-    ) as csv_file:
-
-        writer = csv.DictWriter(
-            csv_file,
-            fieldnames=(
-                rows[0].keys()
-            )
-        )
-
-        writer.writeheader()
-
-        writer.writerows(
-            rows
-        )
-
-
-# ------------------------------------------------------------------
-# Main
-# ------------------------------------------------------------------
-
-def main():
-
-    # --------------------------------------------------------------
-    # Reproducibility
-    # --------------------------------------------------------------
-
-    set_random_seed(
-        RANDOM_SEED
-    )
-
-    # --------------------------------------------------------------
-    # Verify source directories
-    # --------------------------------------------------------------
-
-    source_dirs = [
-        RGB_DIR,
-        IR_DIR,
-        RGB_XML_DIR,
-        IR_XML_DIR,
-    ]
-
-    for directory in source_dirs:
-
-        if not directory.exists():
-
-            raise FileNotFoundError(
-                f"Required dataset "
-                f"directory not found: "
-                f"{directory}"
-            )
-
-    # --------------------------------------------------------------
-    # Create output directories
-    # --------------------------------------------------------------
-
-    output_dirs = (
-        create_output_directories(
-            OUTPUT_ROOT
-        )
-    )
-
-    # --------------------------------------------------------------
-    # Find RGB images
-    # --------------------------------------------------------------
-
     rgb_paths = sorted(
-        RGB_DIR.glob(
-            "*.jpg"
-        )
+        split_config[
+            "rgb"
+        ].glob("*.jpg")
     )
 
     if MAX_SAMPLES is not None:
@@ -1045,131 +1401,742 @@ def main():
             ]
         )
 
-    print(
-        f"Processing "
-        f"{len(rgb_paths)} "
-        f"synchronized RGB/IR pairs..."
+    return rgb_paths
+
+
+# ------------------------------------------------------------------
+# Verify a pair has all required inputs
+# ------------------------------------------------------------------
+
+def get_pair_paths(
+    pair_id,
+    split_config
+):
+    """
+    Construct synchronized IR/XML paths for one pair.
+    """
+
+    ir_path = (
+        split_config["ir"] /
+        f"{pair_id}.jpg"
     )
 
-    metadata_rows = []
+    rgb_xml_path = (
+        split_config["rgb_xml"] /
+        f"{pair_id}.xml"
+    )
+
+    ir_xml_path = (
+        split_config["ir_xml"] /
+        f"{pair_id}.xml"
+    )
+
+    return (
+        ir_path,
+        rgb_xml_path,
+        ir_xml_path
+    )
+
+
+def find_missing_files(
+    ir_path,
+    rgb_xml_path,
+    ir_xml_path
+):
+    """
+    Return any missing synchronized source files.
+    """
+
+    required_files = [
+        ir_path,
+        rgb_xml_path,
+        ir_xml_path,
+    ]
+
+    return [
+        path
+        for path in required_files
+        if not path.exists()
+    ]
+
+
+# ------------------------------------------------------------------
+# Build-state helpers
+# ------------------------------------------------------------------
+
+def split_index(
+    split
+):
+    """
+    Return ordering index for train -> val -> test.
+    """
+
+    order = [
+        "train",
+        "val",
+        "test"
+    ]
+
+    return order.index(
+        split
+    )
+
+
+def should_skip_split(
+    split,
+    resume_split
+):
+    """
+    Determine whether an entire split was completed before the
+    checkpoint.
+    """
+
+    if resume_split is None:
+        return False
+
+    return (
+        split_index(split)
+        <
+        split_index(resume_split)
+    )
+
+
+# ------------------------------------------------------------------
+# Count existing metadata by split
+# ------------------------------------------------------------------
+
+def metadata_split_counts():
+    """
+    Count metadata rows currently written for each split.
+    """
+
+    counts = {
+        "train": 0,
+        "val": 0,
+        "test": 0,
+    }
+
+    for row in read_metadata():
+
+        split = row.get(
+            "split"
+        )
+
+        if split in counts:
+            counts[split] += 1
+
+    return counts
+
+
+# ------------------------------------------------------------------
+# Main
+# ------------------------------------------------------------------
+
+def main():
+    """
+    Build the complete processed dataset.
+
+    The build is resumable. On a fresh run:
+
+        - seed Python and NumPy with RANDOM_SEED
+        - create a new metadata.csv
+        - begin at train sample 0
+
+    On a resumed run:
+
+        - load the most recent checkpoint
+        - trim metadata rows written after that checkpoint
+        - restore Python and NumPy RNG states
+        - continue from the checkpoint's next sample
+    """
 
     # --------------------------------------------------------------
-    # Process synchronized pairs
+    # Validate source dataset
     # --------------------------------------------------------------
 
-    for index, rgb_path in enumerate(
-        rgb_paths,
-        start=1
+    validate_source_directories()
+
+    OUTPUT_ROOT.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    # --------------------------------------------------------------
+    # Determine fresh vs resumed build
+    # --------------------------------------------------------------
+
+    checkpoint = (
+        load_checkpoint()
+    )
+
+    if checkpoint is None:
+
+        print(
+            "Starting fresh dataset build."
+        )
+
+        set_random_seed(
+            RANDOM_SEED
+        )
+
+        initialize_metadata_file()
+
+        resume_split = None
+        resume_index = 0
+        completed_count = 0
+
+        if BUILD_COMPLETE_PATH.exists():
+            BUILD_COMPLETE_PATH.unlink()
+
+    else:
+
+        print(
+            "Checkpoint found."
+        )
+
+        print(
+            "Resuming dataset build..."
+        )
+
+        resume_split = (
+            checkpoint["split"]
+        )
+
+        resume_index = (
+            checkpoint["next_index"]
+        )
+
+        completed_count = (
+            checkpoint[
+                "completed_count"
+            ]
+        )
+
+        # Remove metadata that may have been written between the
+        # checkpoint and the crash.
+        trim_metadata_to_checkpoint(
+            checkpoint
+        )
+
+        # Restore exact RNG state at checkpoint.
+        restore_random_state(
+            checkpoint
+        )
+
+        print(
+            f"Resume split: "
+            f"{resume_split}"
+        )
+
+        print(
+            f"Resume index: "
+            f"{resume_index}"
+        )
+
+        print(
+            f"Completed at checkpoint: "
+            f"{completed_count}"
+        )
+
+    # --------------------------------------------------------------
+    # Process train / val / test
+    # --------------------------------------------------------------
+
+    for split, config in (
+        SPLIT_CONFIGS.items()
     ):
 
-        pair_id = (
-            rgb_path.stem
-        )
+        # ----------------------------------------------------------
+        # If resuming, earlier splits were already completed.
+        # ----------------------------------------------------------
 
-        ir_path = (
-            IR_DIR /
-            f"{pair_id}.jpg"
-        )
+        if should_skip_split(
+            split,
+            resume_split
+        ):
 
-        rgb_xml_path = (
-            RGB_XML_DIR /
-            f"{pair_id}.xml"
-        )
-
-        ir_xml_path = (
-            IR_XML_DIR /
-            f"{pair_id}.xml"
-        )
-
-        required_files = [
-            ir_path,
-            rgb_xml_path,
-            ir_xml_path,
-        ]
-
-        missing_files = [
-            path
-            for path in required_files
-            if not path.exists()
-        ]
-
-        if missing_files:
-
+            print()
             print(
-                f"Skipping pair "
-                f"{pair_id}: "
-                f"missing files "
-                f"{missing_files}"
+                f"Skipping completed split: "
+                f"{split.upper()}"
             )
 
             continue
 
+        print()
         print(
-            f"[{index}/"
-            f"{len(rgb_paths)}] "
-            f"Processing pair "
-            f"{pair_id}"
+            "=" * 70
         )
 
-        metadata = (
-            process_pair(
-                pair_id=pair_id,
-                rgb_path=rgb_path,
-                ir_path=ir_path,
-                rgb_xml_path=(
-                    rgb_xml_path
-                ),
-                ir_xml_path=(
-                    ir_xml_path
-                ),
-                output_dirs=(
-                    output_dirs
-                ),
-                split="train"
+        print(
+            f"PROCESSING SPLIT: "
+            f"{split.upper()}"
+        )
+
+        print(
+            "=" * 70
+        )
+
+        # ----------------------------------------------------------
+        # Create split-specific output directories
+        # ----------------------------------------------------------
+
+        split_output_root = (
+            OUTPUT_ROOT /
+            split
+        )
+
+        output_dirs = (
+            create_output_directories(
+                split_output_root
             )
         )
 
-        metadata_rows.append(
-            metadata
+        # ----------------------------------------------------------
+        # Get candidate RGB paths
+        # ----------------------------------------------------------
+
+        rgb_paths = (
+            get_rgb_paths(
+                config
+            )
         )
 
+        print(
+            f"Processing "
+            f"{len(rgb_paths)} "
+            f"synchronized RGB/IR pairs "
+            f"from {split}..."
+        )
+
+        # ----------------------------------------------------------
+        # Determine starting index for this split
+        # ----------------------------------------------------------
+
+        if (
+            checkpoint is not None
+            and
+            split == resume_split
+        ):
+
+            start_index = (
+                resume_index
+            )
+
+        else:
+
+            start_index = 0
+
+        # ----------------------------------------------------------
+        # Process synchronized pairs
+        # ----------------------------------------------------------
+
+        for zero_index in range(
+            start_index,
+            len(rgb_paths)
+        ):
+
+            rgb_path = (
+                rgb_paths[
+                    zero_index
+                ]
+            )
+
+            pair_id = (
+                rgb_path.stem
+            )
+
+            (
+                ir_path,
+                rgb_xml_path,
+                ir_xml_path
+            ) = get_pair_paths(
+                pair_id,
+                config
+            )
+
+            missing_files = (
+                find_missing_files(
+                    ir_path,
+                    rgb_xml_path,
+                    ir_xml_path
+                )
+            )
+
+            # ------------------------------------------------------
+            # Missing source data
+            # ------------------------------------------------------
+
+            if missing_files:
+
+                print(
+                    f"Skipping pair "
+                    f"{split}/{pair_id}: "
+                    f"missing files "
+                    f"{missing_files}"
+                )
+
+                # IMPORTANT:
+                #
+                # No random numbers were consumed for this sample,
+                # and no metadata row was created.
+                #
+                # Save the next index if this happens to coincide
+                # with a checkpoint boundary.
+                continue
+
+            display_index = (
+                zero_index + 1
+            )
+
+            print(
+                f"[{split} "
+                f"{display_index}/"
+                f"{len(rgb_paths)}] "
+                f"Processing pair "
+                f"{pair_id}"
+            )
+
+            # ------------------------------------------------------
+            # Generate one sample
+            # ------------------------------------------------------
+
+            metadata = (
+                process_pair(
+                    pair_id=pair_id,
+                    rgb_path=rgb_path,
+                    ir_path=ir_path,
+                    rgb_xml_path=(
+                        rgb_xml_path
+                    ),
+                    ir_xml_path=(
+                        ir_xml_path
+                    ),
+                    output_dirs=(
+                        output_dirs
+                    ),
+                    split=split
+                )
+            )
+
+            # ------------------------------------------------------
+            # Persist metadata immediately
+            # ------------------------------------------------------
+
+            append_metadata_row(
+                metadata
+            )
+
+            completed_count += 1
+
+            # ------------------------------------------------------
+            # Periodic checkpoint
+            #
+            # Save RNG state AFTER processing the current sample.
+            # Therefore next_index points to the NEXT sample.
+            # ------------------------------------------------------
+
+            if (
+                completed_count
+                % CHECKPOINT_EVERY
+                == 0
+            ):
+
+                save_checkpoint(
+                    split=split,
+                    next_index=(
+                        zero_index + 1
+                    ),
+                    completed_count=(
+                        completed_count
+                    )
+                )
+
+                print(
+                    f"  Checkpoint saved "
+                    f"after "
+                    f"{completed_count} "
+                    f"total pairs."
+                )
+
+        # ----------------------------------------------------------
+        # Split completed
+        #
+        # Save a checkpoint at the boundary even if the total count
+        # is not an exact multiple of CHECKPOINT_EVERY.
+        #
+        # next_index=len(rgb_paths) means the current split is done.
+        # ----------------------------------------------------------
+
+        save_checkpoint(
+            split=split,
+            next_index=(
+                len(rgb_paths)
+            ),
+            completed_count=(
+                completed_count
+            )
+        )
+
+        # ----------------------------------------------------------
+        # Split summary from persisted metadata
+        # ----------------------------------------------------------
+
+        current_rows = (
+            read_metadata()
+        )
+
+        split_rows = [
+            row
+            for row in current_rows
+            if row["split"] == split
+        ]
+
+        split_degraded = sum(
+            str(
+                row["degraded"]
+            ).lower()
+            == "true"
+            for row in split_rows
+        )
+
+        split_clean = (
+            len(split_rows)
+            -
+            split_degraded
+        )
+
+        print()
+        print(
+            f"{split.upper()} complete."
+        )
+
+        print(
+            f"Processed pairs: "
+            f"{len(split_rows)}"
+        )
+
+        print(
+            f"Actually degraded: "
+            f"{split_degraded}"
+        )
+
+        print(
+            f"Clean: "
+            f"{split_clean}"
+        )
+
+        # ----------------------------------------------------------
+        # Important resume-boundary handling
+        #
+        # Once this split completes normally, subsequent splits must
+        # start from index 0.
+        # ----------------------------------------------------------
+
+        if (
+            checkpoint is not None
+            and
+            split == resume_split
+        ):
+            checkpoint = None
+            resume_split = None
+            resume_index = 0
+
+        # ----------------------------------------------------------
+        # Save boundary checkpoint for NEXT split
+        #
+        # This makes a crash immediately after a completed split
+        # resumable without replaying that split.
+        # ----------------------------------------------------------
+
+        split_names = list(
+            SPLIT_CONFIGS.keys()
+        )
+
+        current_split_position = (
+            split_names.index(
+                split
+            )
+        )
+
+        if (
+            current_split_position
+            <
+            len(split_names) - 1
+        ):
+
+            next_split = (
+                split_names[
+                    current_split_position + 1
+                ]
+            )
+
+            save_checkpoint(
+                split=next_split,
+                next_index=0,
+                completed_count=(
+                    completed_count
+                )
+            )
+
     # --------------------------------------------------------------
-    # Save metadata
+    # Entire dataset completed successfully
     # --------------------------------------------------------------
 
-    metadata_path = (
-        OUTPUT_ROOT /
-        "metadata.csv"
+    all_rows = (
+        read_metadata()
     )
-
-    write_metadata(
-        metadata_rows,
-        metadata_path
-    )
-
-    # --------------------------------------------------------------
-    # Summary
-    # --------------------------------------------------------------
 
     degraded_count = sum(
-        row["degraded"]
-        for row in metadata_rows
+        str(
+            row["degraded"]
+        ).lower()
+        == "true"
+        for row in all_rows
     )
 
     clean_count = (
-        len(metadata_rows) -
+        len(all_rows)
+        -
         degraded_count
     )
 
-    print()
+    # --------------------------------------------------------------
+    # Count samples by split
+    # --------------------------------------------------------------
 
+    split_counts = {
+        "train": 0,
+        "val": 0,
+        "test": 0,
+    }
+
+    for row in all_rows:
+
+        split = row.get(
+            "split"
+        )
+
+        if split in split_counts:
+            split_counts[split] += 1
+
+    # --------------------------------------------------------------
+    # Final integrity check
+    # --------------------------------------------------------------
+
+    metadata_keys = [
+        (
+            row["split"],
+            row["pair_id"]
+        )
+        for row in all_rows
+    ]
+
+    unique_metadata_keys = set(
+        metadata_keys
+    )
+
+    if (
+        len(metadata_keys)
+        !=
+        len(unique_metadata_keys)
+    ):
+
+        raise RuntimeError(
+            "Duplicate (split, pair_id) "
+            "entries detected in metadata.csv."
+        )
+
+    # --------------------------------------------------------------
+    # Write completion marker
+    # --------------------------------------------------------------
+
+    with open(
+        BUILD_COMPLETE_PATH,
+        "w"
+    ) as completion_file:
+
+        completion_file.write(
+            "PACE processed dataset "
+            "generation completed "
+            "successfully.\n"
+        )
+
+        completion_file.write(
+            f"seed={RANDOM_SEED}\n"
+        )
+
+        completion_file.write(
+            f"total_pairs="
+            f"{len(all_rows)}\n"
+        )
+
+        completion_file.write(
+            f"train_pairs="
+            f"{split_counts['train']}\n"
+        )
+
+        completion_file.write(
+            f"val_pairs="
+            f"{split_counts['val']}\n"
+        )
+
+        completion_file.write(
+            f"test_pairs="
+            f"{split_counts['test']}\n"
+        )
+
+        completion_file.write(
+            f"degraded_pairs="
+            f"{degraded_count}\n"
+        )
+
+        completion_file.write(
+            f"clean_pairs="
+            f"{clean_count}\n"
+        )
+
+    # --------------------------------------------------------------
+    # Remove active checkpoint ONLY after everything above succeeds
+    # --------------------------------------------------------------
+
+    clear_checkpoint()
+
+    # --------------------------------------------------------------
+    # Final summary
+    # --------------------------------------------------------------
+
+    print()
     print(
-        "Dataset generation complete."
+        "=" * 70
     )
 
     print(
-        f"Processed pairs: "
-        f"{len(metadata_rows)}"
+        "DATASET GENERATION COMPLETE"
+    )
+
+    print(
+        "=" * 70
+    )
+
+    print(
+        f"Total processed pairs: "
+        f"{len(all_rows)}"
+    )
+
+    print(
+        f"  train: "
+        f"{split_counts['train']}"
+    )
+
+    print(
+        f"  val: "
+        f"{split_counts['val']}"
+    )
+
+    print(
+        f"  test: "
+        f"{split_counts['test']}"
     )
 
     print(
@@ -1189,7 +2156,16 @@ def main():
 
     print(
         f"Metadata: "
-        f"{metadata_path.resolve()}"
+        f"{METADATA_PATH.resolve()}"
+    )
+
+    print(
+        f"Completion marker: "
+        f"{BUILD_COMPLETE_PATH.resolve()}"
+    )
+
+    print(
+        "Active checkpoint removed."
     )
 
 
