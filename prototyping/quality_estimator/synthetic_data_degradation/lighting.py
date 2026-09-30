@@ -1,162 +1,379 @@
 """
-How good the original RGB image is
-- compute pixel luminance
-- determine sufficiently-lit regions
-- produce baseline RGB 8×8 quality map
+Baseline RGB quality estimation from lighting.
 
-RGB lighting analysis utilities.
+The goal is NOT to measure how bright a region is.
 
-Note: lighting thresholds should be updated after sufficient luminance stats are checked across a sample of the dataset
+Instead, lighting quality estimates whether insufficient illumination
+makes RGB information unreliable.
+
+Therefore:
+    - very dark pixels receive quality near 0
+    - dim / transitional pixels receive intermediate quality
+    - adequately illuminated pixels quickly saturate at quality 1
+
+IR baseline quality is handled separately and is assumed to be 1.0
+before synthetic degradation.
 """
 
 import cv2
 import numpy as np
 
 
-GRID_SIZE = 8
+# ------------------------------------------------------------------
+# Lighting thresholds
+# ------------------------------------------------------------------
 
-# Initial thresholds. These should be calibrated against the
-# DroneVehicle RGB luminance distribution before full generation.
-DARK_THRESHOLD = 0.10
-GOOD_THRESHOLD = 0.35
+# Below this luminance, RGB information is considered effectively
+# unusable because of insufficient illumination.
+DARK_THRESHOLD = 0.05
 
+# Above this luminance, lighting is considered sufficiently good.
+# Further brightness should NOT increase quality.
+GOOD_THRESHOLD = 0.15
+
+
+# ------------------------------------------------------------------
+# Luminance
+# ------------------------------------------------------------------
 
 def compute_luminance(image):
     """
-    Convert an RGB/BGR uint8 image into normalized luminance [0, 1].
+    Compute normalized luminance for a BGR OpenCV image.
 
-    OpenCV images are assumed to use BGR channel ordering.
+    Parameters
+    ----------
+    image : np.ndarray
+        BGR uint8 image.
 
-    Returns:
-        luminance: H x W float32 array in [0, 1].
+    Returns
+    -------
+    np.ndarray
+        2D float32 luminance map in [0, 1].
     """
+
     if image is None:
-        raise ValueError("Input image cannot be None.")
+        raise ValueError("image cannot be None")
 
-    image = image.astype(np.float32) / 255.0
-
-    # OpenCV ordering: B, G, R
-    b = image[:, :, 0]
-    g = image[:, :, 1]
-    r = image[:, :, 2]
-
-    luminance = (
-        0.2126 * r +
-        0.7152 * g +
-        0.0722 * b
+    image_float = (
+        image.astype(np.float32)
+        / 255.0
     )
 
-    return np.clip(luminance, 0.0, 1.0)
+    b = image_float[:, :, 0]
+    g = image_float[:, :, 1]
+    r = image_float[:, :, 2]
+
+    # Standard perceptual luminance weighting.
+    luminance = (
+        0.2126 * r
+        + 0.7152 * g
+        + 0.0722 * b
+    )
+
+    return luminance.astype(
+        np.float32
+    )
 
 
-def luminance_to_quality(
-    luminance,
-    dark_threshold=DARK_THRESHOLD,
-    good_threshold=GOOD_THRESHOLD
-):
+# ------------------------------------------------------------------
+# Luminance -> quality
+# ------------------------------------------------------------------
+
+def luminance_to_quality(luminance):
     """
-    Convert luminance into continuous quality values.
+    Convert luminance into baseline RGB lighting quality.
 
-    luminance <= dark_threshold -> 0
-    luminance >= good_threshold -> 1
-    values between thresholds are linearly interpolated.
+    This is intentionally a narrow transition.
+
+    DARK_THRESHOLD:
+        quality = 0
+
+    GOOD_THRESHOLD:
+        quality = 1
+
+    Between the thresholds:
+        quality increases linearly from 0 -> 1.
+
+    Importantly, pixels brighter than GOOD_THRESHOLD are all assigned
+    quality 1.0. We do not penalize naturally darker scene content
+    once it is sufficiently illuminated.
     """
-    if good_threshold <= dark_threshold:
-        raise ValueError(
-            "good_threshold must be greater than dark_threshold."
-        )
+
+    luminance = np.asarray(
+        luminance,
+        dtype=np.float32
+    )
 
     quality = (
-        (luminance - dark_threshold) /
-        (good_threshold - dark_threshold)
+        luminance - DARK_THRESHOLD
+    ) / (
+        GOOD_THRESHOLD - DARK_THRESHOLD
     )
 
-    return np.clip(quality, 0.0, 1.0).astype(np.float32)
+    quality = np.clip(
+        quality,
+        0.0,
+        1.0
+    )
+
+    return quality.astype(
+        np.float32
+    )
 
 
-def compute_sufficient_light_mask(
-    luminance,
-    threshold=GOOD_THRESHOLD
+# ------------------------------------------------------------------
+# Full-resolution lighting quality
+# ------------------------------------------------------------------
+
+def compute_lighting_quality(image):
+    """
+    Compute a full-resolution RGB lighting-quality map.
+
+    Parameters
+    ----------
+    image : np.ndarray
+        BGR uint8 image.
+
+    Returns
+    -------
+    np.ndarray
+        H x W quality map in [0, 1].
+    """
+
+    luminance = compute_luminance(
+        image
+    )
+
+    quality = luminance_to_quality(
+        luminance
+    )
+
+    return quality
+
+
+# ------------------------------------------------------------------
+# 8x8 baseline quality
+# ------------------------------------------------------------------
+
+def compute_rgb_quality_map(
+    image,
+    grid_size=8
 ):
     """
-    Return a binary H x W mask indicating pixels with sufficient
-    illumination for meaningful synthetic RGB degradation.
-    """
-    return (luminance >= threshold).astype(np.uint8)
+    Compute the 8x8 baseline RGB quality map.
 
+    Lighting quality is first calculated at pixel resolution and then
+    averaged within each spatial grid cell.
 
-def downsample_to_grid(values, grid_size=GRID_SIZE):
-    """
-    Convert a pixel-level H x W map into a grid_size x grid_size map.
+    This preserves localized low-light information rather than
+    collapsing an entire patch to its mean luminance before evaluating
+    lighting quality.
 
-    Each grid cell contains the mean value of the corresponding
-    image region.
+    Parameters
+    ----------
+    image : np.ndarray
+        BGR uint8 image.
+
+    grid_size : int
+        Number of rows and columns in the output quality grid.
+
+    Returns
+    -------
+    np.ndarray
+        grid_size x grid_size float32 quality map.
     """
-    height, width = values.shape
+
+    pixel_quality = (
+        compute_lighting_quality(
+            image
+        )
+    )
+
+    height, width = (
+        pixel_quality.shape
+    )
 
     row_edges = np.linspace(
-        0, height, grid_size + 1, dtype=int
-    )
-    col_edges = np.linspace(
-        0, width, grid_size + 1, dtype=int
+        0,
+        height,
+        grid_size + 1,
+        dtype=int
     )
 
-    grid = np.zeros(
+    col_edges = np.linspace(
+        0,
+        width,
+        grid_size + 1,
+        dtype=int
+    )
+
+    quality_map = np.zeros(
+        (
+            grid_size,
+            grid_size
+        ),
+        dtype=np.float32
+    )
+
+    for row in range(
+        grid_size
+    ):
+
+        y0 = row_edges[row]
+        y1 = row_edges[row + 1]
+
+        for col in range(
+            grid_size
+        ):
+
+            x0 = col_edges[col]
+            x1 = col_edges[col + 1]
+
+            patch = pixel_quality[
+                y0:y1,
+                x0:x1
+            ]
+
+            if patch.size == 0:
+                quality_map[
+                    row,
+                    col
+                ] = 1.0
+            else:
+                quality_map[
+                    row,
+                    col
+                ] = float(
+                    np.mean(patch)
+                )
+
+    return quality_map
+
+
+# ------------------------------------------------------------------
+# RGB degradation eligibility
+# ------------------------------------------------------------------
+
+def sufficiently_lit_mask(image):
+    """
+    Return a boolean mask identifying pixels that are sufficiently
+    illuminated for meaningful synthetic RGB degradation.
+
+    We only synthetically degrade RGB where the underlying RGB signal
+    is already usable.
+
+    This prevents synthetic degradation from being placed primarily
+    over regions that are already unusable because of darkness.
+    """
+
+    luminance = compute_luminance(
+        image
+    )
+
+    return (
+        luminance >= GOOD_THRESHOLD
+    )
+
+
+# ------------------------------------------------------------------
+# Convenience
+# ------------------------------------------------------------------
+
+def get_lighting_quality(
+    image,
+    grid_size=8
+):
+    """
+    Convenience wrapper for generating an 8x8 RGB lighting-quality map.
+    """
+
+    return compute_rgb_quality_map(
+        image,
+        grid_size=grid_size
+    )
+
+def compute_rgb_baseline_quality(
+    image,
+    grid_size=8
+):
+    """
+    Compute baseline RGB quality information.
+
+    Returns
+    -------
+    quality_map : np.ndarray
+        8x8 baseline RGB quality map.
+
+    sufficient_light_mask : np.ndarray
+        Full-resolution uint8 mask indicating pixels where RGB
+        contains sufficient visible-light information for meaningful
+        synthetic degradation.
+
+    luminance : np.ndarray
+        Full-resolution normalized luminance map in [0, 1].
+    """
+
+    # Full-resolution luminance
+    luminance = compute_luminance(image)
+
+    # Full-resolution lighting quality
+    pixel_quality = luminance_to_quality(
+        luminance
+    )
+
+    # Pixels where RGB is sufficiently illuminated for synthetic
+    # degradation.
+    sufficient_light_mask = (
+        luminance >= GOOD_THRESHOLD
+    ).astype(np.uint8)
+
+    # --------------------------------------------------------------
+    # Convert full-resolution quality into 8x8 target
+    # --------------------------------------------------------------
+
+    height, width = pixel_quality.shape
+
+    row_edges = np.linspace(
+        0,
+        height,
+        grid_size + 1,
+        dtype=int
+    )
+
+    col_edges = np.linspace(
+        0,
+        width,
+        grid_size + 1,
+        dtype=int
+    )
+
+    quality_map = np.zeros(
         (grid_size, grid_size),
         dtype=np.float32
     )
 
     for row in range(grid_size):
+
+        y0 = row_edges[row]
+        y1 = row_edges[row + 1]
+
         for col in range(grid_size):
-            region = values[
-                row_edges[row]:row_edges[row + 1],
-                col_edges[col]:col_edges[col + 1]
+
+            x0 = col_edges[col]
+            x1 = col_edges[col + 1]
+
+            patch = pixel_quality[
+                y0:y1,
+                x0:x1
             ]
 
-            if region.size > 0:
-                grid[row, col] = np.mean(region)
-
-    return grid
-
-
-def compute_rgb_baseline_quality(
-    image,
-    dark_threshold=DARK_THRESHOLD,
-    good_threshold=GOOD_THRESHOLD
-):
-    """
-    Compute all lighting information needed for one RGB image.
-
-    Returns:
-        baseline_quality:
-            8x8 RGB baseline quality map.
-
-        sufficient_light_mask:
-            H x W binary mask specifying where RGB degradation
-            can meaningfully be applied.
-
-        luminance:
-            H x W normalized luminance map.
-    """
-    luminance = compute_luminance(image)
-
-    pixel_quality = luminance_to_quality(
-        luminance,
-        dark_threshold,
-        good_threshold
-    )
-
-    baseline_quality = downsample_to_grid(
-        pixel_quality
-    )
-
-    sufficient_light_mask = compute_sufficient_light_mask(
-        luminance,
-        threshold=good_threshold
-    )
+            if patch.size > 0:
+                quality_map[row, col] = float(
+                    np.mean(patch)
+                )
 
     return (
-        baseline_quality,
+        quality_map,
         sufficient_light_mask,
         luminance
     )

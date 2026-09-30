@@ -103,7 +103,7 @@ IR_XML_DIR = (
 
 # Keep small while validating.
 # Set to None for the full training set.
-MAX_SAMPLES = 10
+MAX_SAMPLES = 500
 
 
 # ------------------------------------------------------------------

@@ -1,0 +1,329 @@
+======================================================================
+PACE SYNTHETIC DATASET EVALUATION
+======================================================================
+
+Samples in metadata: 500
+Lighting thresholds under evaluation: DARK=0.050, GOOD=0.150
+Processed 100/500
+Processed 200/500
+Processed 300/500
+Processed 400/500
+Processed 500/500
+
+Successfully evaluated: 500
+
+======================================================================
+1. ORIGINAL RGB LIGHTING DISTRIBUTION
+======================================================================
+
+Mean luminance per image
+------------------------
+    min: 0.0081
+    p05: 0.0132
+    p10: 0.0162
+    p25: 0.0257
+ median: 0.4966
+    p75: 0.6177
+    p90: 0.6622
+    p95: 0.6922
+    max: 0.7940
+   mean: 0.3607
+
+Median luminance per image
+--------------------------
+    min: 0.0039
+    p05: 0.0078
+    p10: 0.0101
+    p25: 0.0160
+ median: 0.5000
+    p75: 0.6275
+    p90: 0.6777
+    p95: 0.7096
+    max: 0.7877
+   mean: 0.3573
+
+Fraction of pixels <= DARK_THRESHOLD (0.05)
+-------------------------------------------
+    min: 0.0000
+    p05: 0.0000
+    p10: 0.0000
+    p25: 0.0000
+ median: 0.0000
+    p75: 0.8887
+    p90: 0.9549
+    p95: 0.9708
+    max: 0.9948
+   mean: 0.3475
+
+Fraction of pixels >= GOOD_THRESHOLD (0.15)
+-------------------------------------------
+    min: 0.0000
+    p05: 0.0011
+    p10: 0.0026
+    p25: 0.0119
+ median: 0.9998
+    p75: 1.0000
+    p90: 1.0000
+    p95: 1.0000
+    max: 1.0000
+   mean: 0.6073
+
+Fraction of intermediate-light pixels
+-------------------------------------
+    min: 0.0000
+    p05: 0.0000
+    p10: 0.0000
+    p25: 0.0000
+ median: 0.0002
+    p75: 0.0689
+    p90: 0.1486
+    p95: 0.2101
+    max: 0.4959
+   mean: 0.0451
+
+======================================================================
+2. RGB QUALITY DISTRIBUTION
+======================================================================
+
+All RGB 8x8 quality values
+--------------------------
+    min: 0.0000
+    p05: 0.0004
+    p10: 0.0009
+    p25: 0.0079
+ median: 1.0000
+    p75: 1.0000
+    p90: 1.0000
+    p95: 1.0000
+    max: 1.0000
+   mean: 0.6132
+
+RGB patch categories:
+  quality <= 0.10:  34.68%
+  quality 0.10-0.50: 4.38%
+  quality 0.50-0.90: 3.48%
+  quality >= 0.90:   57.46%
+
+Mean RGB quality per image
+--------------------------
+    min: 0.0010
+    p05: 0.0074
+    p10: 0.0142
+    p25: 0.0380
+ median: 0.9563
+    p75: 1.0000
+    p90: 1.0000
+    p95: 1.0000
+    max: 1.0000
+   mean: 0.6132
+
+======================================================================
+3. IR QUALITY DISTRIBUTION
+======================================================================
+
+All IR 8x8 quality values
+-------------------------
+    min: 0.0180
+    p05: 0.9946
+    p10: 1.0000
+    p25: 1.0000
+ median: 1.0000
+    p75: 1.0000
+    p90: 1.0000
+    p95: 1.0000
+    max: 1.0000
+   mean: 0.9878
+
+IR patches at exactly 1.0: 94.58%
+
+Mean IR quality per image
+-------------------------
+    min: 0.8254
+    p05: 0.9264
+    p10: 0.9443
+    p25: 1.0000
+ median: 1.0000
+    p75: 1.0000
+    p90: 1.0000
+    p95: 1.0000
+    max: 1.0000
+   mean: 0.9878
+
+======================================================================
+4. SYNTHETIC DEGRADATION DISTRIBUTION
+======================================================================
+
+Clean examples: 292 (58.40%)
+Actually degraded examples: 208 (41.60%)
+
+Degraded modalities:
+  ir: 123 (59.13%)
+  rgb: 85 (40.87%)
+
+Degradation types:
+  motion_blur: 54 (25.96%)
+  saturation: 51 (24.52%)
+  sensor_noise: 50 (24.04%)
+  water_blur: 53 (25.48%)
+
+Modality / degradation combinations:
+  ir  / motion_blur    :   36 (17.31%)
+  ir  / saturation     :   27 (12.98%)
+  ir  / sensor_noise   :   26 (12.50%)
+  ir  / water_blur     :   34 (16.35%)
+  rgb / motion_blur    :   18 (8.65%)
+  rgb / saturation     :   24 (11.54%)
+  rgb / sensor_noise   :   24 (11.54%)
+  rgb / water_blur     :   19 (9.13%)
+
+Degradation severity
+--------------------
+    min: 0.2063
+    p05: 0.2430
+    p10: 0.2860
+    p25: 0.3784
+ median: 0.5930
+    p75: 0.8063
+    p90: 0.9240
+    p95: 0.9417
+    max: 0.9922
+   mean: 0.5939
+
+======================================================================
+5. REPRESENTATIVE RGB SAMPLES
+======================================================================
+
+Samples spanning the RGB quality distribution:
+
+pair          mean Q    mean lum     med lum    dark %    good %
+----------------------------------------------------------------
+00011          0.001       0.008       0.006    99.5%     0.0%
+00146          0.010       0.013       0.008    96.5%     0.2%
+00016          0.021       0.018       0.012    93.8%     0.6%
+00053          0.030       0.020       0.011    90.4%     0.6%
+00163          0.053       0.032       0.022    81.0%     1.2%
+00162          0.199       0.062       0.030    66.3%    11.5%
+00127          0.843       0.293       0.260     7.3%    75.0%
+00328          0.956       0.625       0.627     0.0%   100.0%
+00481          0.994       0.629       0.669     0.0%   100.0%
+00354          1.000       0.483       0.476     0.0%   100.0%
+00314          1.000       0.605       0.631     0.0%   100.0%
+00489          1.000       0.652       0.699     0.0%   100.0%
+00490          1.000       0.632       0.680     0.0%   100.0%
+00263          1.000       0.612       0.616     0.0%   100.0%
+00499          1.000       0.709       0.728     0.0%   100.0%
+
+======================================================================
+6. LIGHTING THRESHOLD CASES
+======================================================================
+
+Images closest to 50% sufficiently-lit pixels:
+
+pair          good %    dark %    mean lum    mean Q
+----------------------------------------------------
+00159         48.3%    37.0%       0.189     0.524
+00004         47.8%    33.1%       0.178     0.572
+00137         52.4%    16.8%       0.197     0.604
+00068         52.9%    27.6%       0.162     0.521
+00108         53.0%    24.3%       0.208     0.599
+00057         46.9%    31.3%       0.193     0.544
+00125         46.8%    26.0%       0.209     0.577
+00124         46.6%    31.1%       0.201     0.544
+00006         54.5%    20.6%       0.261     0.645
+00001         44.7%    11.8%       0.165     0.659
+
+Darkest RGB images:
+
+pair          mean lum    mean Q    dark %
+------------------------------------------
+00050            0.008     0.005    98.3%
+00011            0.008     0.001    99.5%
+00032            0.008     0.003    98.8%
+00010            0.009     0.001    99.4%
+00038            0.009     0.003    98.7%
+00033            0.010     0.011    97.7%
+00154            0.011     0.004    98.2%
+00009            0.011     0.002    98.7%
+00048            0.011     0.016    96.7%
+00049            0.011     0.015    95.7%
+
+Brightest RGB images:
+
+pair          mean lum    mean Q    good %
+------------------------------------------
+00222            0.794     1.000   100.0%
+00219            0.779     1.000   100.0%
+00220            0.777     1.000   100.0%
+00498            0.764     1.000   100.0%
+00218            0.761     1.000   100.0%
+00250            0.752     0.929   100.0%
+00221            0.750     1.000   100.0%
+00237            0.749     1.000   100.0%
+00217            0.743     1.000   100.0%
+00238            0.742     1.000   100.0%
+
+======================================================================
+7. BASIC LABEL INTEGRITY
+======================================================================
+
+RGB values outside [0,1]: 0
+IR values outside [0,1]:  0
+RGB NaN values: 0
+IR NaN values:  0
+
+======================================================================
+8. RECOMMENDED MANUAL INSPECTION
+======================================================================
+
+Inspect these RGB examples before changing lighting thresholds:
+
+python prototyping/quality_estimator/synthetic_data_degradation/visualize_quality.py 00050 rgb
+python prototyping/quality_estimator/synthetic_data_degradation/visualize_quality.py 00011 rgb
+python prototyping/quality_estimator/synthetic_data_degradation/visualize_quality.py 00032 rgb
+python prototyping/quality_estimator/synthetic_data_degradation/visualize_quality.py 00159 rgb
+python prototyping/quality_estimator/synthetic_data_degradation/visualize_quality.py 00004 rgb
+python prototyping/quality_estimator/synthetic_data_degradation/visualize_quality.py 00137 rgb
+python prototyping/quality_estimator/synthetic_data_degradation/visualize_quality.py 00068 rgb
+python prototyping/quality_estimator/synthetic_data_degradation/visualize_quality.py 00108 rgb
+python prototyping/quality_estimator/synthetic_data_degradation/visualize_quality.py 00163 rgb
+python prototyping/quality_estimator/synthetic_data_degradation/visualize_quality.py 00481 rgb
+python prototyping/quality_estimator/synthetic_data_degradation/visualize_quality.py 00490 rgb
+python prototyping/quality_estimator/synthetic_data_degradation/visualize_quality.py 00222 rgb
+python prototyping/quality_estimator/synthetic_data_degradation/visualize_quality.py 00219 rgb
+
+======================================================================
+9. WHAT TO LOOK FOR
+======================================================================
+
+Use these statistics together with the visualizations.
+
+For DARK_THRESHOLD:
+  - Inspect the darkest and low-quality examples.
+  - Regions at/below this threshold should contain essentially
+    unusable visible information.
+  - If useful object/scene information is being labeled near 0,
+    DARK_THRESHOLD may be too high.
+  - If effectively black regions receive meaningful quality,
+    DARK_THRESHOLD may be too low.
+
+For GOOD_THRESHOLD:
+  - Inspect the borderline examples.
+  - Regions at/above this threshold should contain clearly usable
+    visible information.
+  - If visibly poor/dim regions are already treated as fully good,
+    GOOD_THRESHOLD may be too low.
+  - If clearly usable regions rarely reach full quality,
+    GOOD_THRESHOLD may be too high.
+
+For degradation balance:
+  - Compare the actual degraded percentage with the desired dataset
+    composition.
+  - Check RGB vs IR balance.
+  - Check degradation-type balance.
+  - Remember that RGB attempts may be rejected when too little of the
+    sampled mask overlaps sufficiently illuminated image regions.
+
+Do not choose new thresholds from numerical percentiles alone.
+The final decision should combine these statistics with visual
+inspection of representative images.
+
