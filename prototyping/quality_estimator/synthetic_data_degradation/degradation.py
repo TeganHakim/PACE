@@ -1,4 +1,7 @@
 """
+
+HOW to degrade an image.
+
 Synthetic camera and sensor degradation utilities.
 
 Goal: take an image and return a realistically degraded image plus metadata describing exactly what was done.
@@ -149,22 +152,35 @@ def apply_saturation(image, mask, severity):
 def apply_degradation(
     image,
     degradation_type=None,
-    severity=None
+    severity=None,
+    mask=None
 ):
     """
     Main entry point.
 
     Args:
         image: RGB or IR image as a NumPy array.
-        degradation_type: Type of degradation to apply. If None,
+
+        degradation_type:
+            Type of degradation to apply. If None,
             one is selected randomly.
-        severity: Degradation severity in the range [0, 1].
+
+        severity:
+            Degradation severity in the range [0, 1].
             If None, a random severity is selected.
 
+        mask:
+            Optional externally generated binary degradation mask.
+            If None, a random mask is generated.
+
     Returns:
-        degraded_image: Degraded image as uint8.
-        metadata: Dictionary describing the degradation.
+        degraded_image:
+            Degraded image as uint8.
+
+        metadata:
+            Dictionary describing the degradation.
     """
+
     if image is None:
         raise ValueError("Input image cannot be None.")
 
@@ -184,14 +200,40 @@ def apply_degradation(
         "saturation"
     ]
 
+    # Randomly choose degradation type if not provided.
     if degradation_type is None:
-        degradation_type = random.choice(degradation_types)
+        degradation_type = random.choice(
+            degradation_types
+        )
 
+    # Randomly choose severity if not provided.
     if severity is None:
-        severity = random.uniform(0.2, 1.0)
+        severity = random.uniform(
+            0.2,
+            1.0
+        )
 
-    mask = generate_mask(height,width)
+    # Generate a random degradation mask unless
+    # an external mask was provided.
+    if mask is None:
+        mask = generate_mask(
+            height,
+            width
+        )
+    else:
+        # Ensure supplied mask matches image dimensions.
+        if mask.shape != (height, width):
+            raise ValueError(
+                f"Mask shape {mask.shape} does not match "
+                f"image shape {(height, width)}."
+            )
 
+        # Ensure binary uint8 mask.
+        mask = (
+            mask > 0
+        ).astype(np.uint8)
+
+    # Apply selected degradation.
     if degradation_type == "water_blur":
         output = apply_water_blur(
             image,
@@ -232,6 +274,10 @@ def apply_degradation(
     }
 
     return (
-        np.clip(output, 0, 255).astype(np.uint8),
+        np.clip(
+            output,
+            0,
+            255
+        ).astype(np.uint8),
         metadata
     )

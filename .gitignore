@@ -221,3 +221,7 @@ __marimo__/
 # ---- PACE ---- # 
 .venv/
 VisDrone-DroneVehicle/
+
+processed_dataset/
+.complete/
+archive*.zip
