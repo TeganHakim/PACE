@@ -18,7 +18,6 @@ before synthetic degradation.
 import cv2
 import numpy as np
 
-
 # ------------------------------------------------------------------
 # Lighting thresholds
 # ------------------------------------------------------------------
@@ -35,6 +34,7 @@ GOOD_THRESHOLD = 0.15
 # ------------------------------------------------------------------
 # Luminance
 # ------------------------------------------------------------------
+
 
 def compute_luminance(image):
     """
@@ -54,30 +54,22 @@ def compute_luminance(image):
     if image is None:
         raise ValueError("image cannot be None")
 
-    image_float = (
-        image.astype(np.float32)
-        / 255.0
-    )
+    image_float = image.astype(np.float32) / 255.0
 
     b = image_float[:, :, 0]
     g = image_float[:, :, 1]
     r = image_float[:, :, 2]
 
     # Standard perceptual luminance weighting.
-    luminance = (
-        0.2126 * r
-        + 0.7152 * g
-        + 0.0722 * b
-    )
+    luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
 
-    return luminance.astype(
-        np.float32
-    )
+    return luminance.astype(np.float32)
 
 
 # ------------------------------------------------------------------
 # Luminance -> quality
 # ------------------------------------------------------------------
+
 
 def luminance_to_quality(luminance):
     """
@@ -99,31 +91,19 @@ def luminance_to_quality(luminance):
     once it is sufficiently illuminated.
     """
 
-    luminance = np.asarray(
-        luminance,
-        dtype=np.float32
-    )
+    luminance = np.asarray(luminance, dtype=np.float32)
 
-    quality = (
-        luminance - DARK_THRESHOLD
-    ) / (
-        GOOD_THRESHOLD - DARK_THRESHOLD
-    )
+    quality = (luminance - DARK_THRESHOLD) / (GOOD_THRESHOLD - DARK_THRESHOLD)
 
-    quality = np.clip(
-        quality,
-        0.0,
-        1.0
-    )
+    quality = np.clip(quality, 0.0, 1.0)
 
-    return quality.astype(
-        np.float32
-    )
+    return quality.astype(np.float32)
 
 
 # ------------------------------------------------------------------
 # Full-resolution lighting quality
 # ------------------------------------------------------------------
+
 
 def compute_lighting_quality(image):
     """
@@ -140,13 +120,9 @@ def compute_lighting_quality(image):
         H x W quality map in [0, 1].
     """
 
-    luminance = compute_luminance(
-        image
-    )
+    luminance = compute_luminance(image)
 
-    quality = luminance_to_quality(
-        luminance
-    )
+    quality = luminance_to_quality(luminance)
 
     return quality
 
@@ -155,10 +131,8 @@ def compute_lighting_quality(image):
 # 8x8 baseline quality
 # ------------------------------------------------------------------
 
-def compute_rgb_quality_map(
-    image,
-    grid_size=8
-):
+
+def compute_rgb_quality_map(image, grid_size=8):
     """
     Compute the 8x8 baseline RGB quality map.
 
@@ -183,69 +157,32 @@ def compute_rgb_quality_map(
         grid_size x grid_size float32 quality map.
     """
 
-    pixel_quality = (
-        compute_lighting_quality(
-            image
-        )
-    )
+    pixel_quality = compute_lighting_quality(image)
 
-    height, width = (
-        pixel_quality.shape
-    )
+    height, width = pixel_quality.shape
 
-    row_edges = np.linspace(
-        0,
-        height,
-        grid_size + 1,
-        dtype=int
-    )
+    row_edges = np.linspace(0, height, grid_size + 1, dtype=int)
 
-    col_edges = np.linspace(
-        0,
-        width,
-        grid_size + 1,
-        dtype=int
-    )
+    col_edges = np.linspace(0, width, grid_size + 1, dtype=int)
 
-    quality_map = np.zeros(
-        (
-            grid_size,
-            grid_size
-        ),
-        dtype=np.float32
-    )
+    quality_map = np.zeros((grid_size, grid_size), dtype=np.float32)
 
-    for row in range(
-        grid_size
-    ):
+    for row in range(grid_size):
 
         y0 = row_edges[row]
         y1 = row_edges[row + 1]
 
-        for col in range(
-            grid_size
-        ):
+        for col in range(grid_size):
 
             x0 = col_edges[col]
             x1 = col_edges[col + 1]
 
-            patch = pixel_quality[
-                y0:y1,
-                x0:x1
-            ]
+            patch = pixel_quality[y0:y1, x0:x1]
 
             if patch.size == 0:
-                quality_map[
-                    row,
-                    col
-                ] = 1.0
+                quality_map[row, col] = 1.0
             else:
-                quality_map[
-                    row,
-                    col
-                ] = float(
-                    np.mean(patch)
-                )
+                quality_map[row, col] = float(np.mean(patch))
 
     return quality_map
 
@@ -253,6 +190,7 @@ def compute_rgb_quality_map(
 # ------------------------------------------------------------------
 # RGB degradation eligibility
 # ------------------------------------------------------------------
+
 
 def sufficiently_lit_mask(image):
     """
@@ -266,36 +204,25 @@ def sufficiently_lit_mask(image):
     over regions that are already unusable because of darkness.
     """
 
-    luminance = compute_luminance(
-        image
-    )
+    luminance = compute_luminance(image)
 
-    return (
-        luminance >= GOOD_THRESHOLD
-    )
+    return luminance >= GOOD_THRESHOLD
 
 
 # ------------------------------------------------------------------
 # Convenience
 # ------------------------------------------------------------------
 
-def get_lighting_quality(
-    image,
-    grid_size=8
-):
+
+def get_lighting_quality(image, grid_size=8):
     """
     Convenience wrapper for generating an 8x8 RGB lighting-quality map.
     """
 
-    return compute_rgb_quality_map(
-        image,
-        grid_size=grid_size
-    )
+    return compute_rgb_quality_map(image, grid_size=grid_size)
 
-def compute_rgb_baseline_quality(
-    image,
-    grid_size=8
-):
+
+def compute_rgb_baseline_quality(image, grid_size=8):
     """
     Compute baseline RGB quality information.
 
@@ -317,15 +244,11 @@ def compute_rgb_baseline_quality(
     luminance = compute_luminance(image)
 
     # Full-resolution lighting quality
-    pixel_quality = luminance_to_quality(
-        luminance
-    )
+    pixel_quality = luminance_to_quality(luminance)
 
     # Pixels where RGB is sufficiently illuminated for synthetic
     # degradation.
-    sufficient_light_mask = (
-        luminance >= GOOD_THRESHOLD
-    ).astype(np.uint8)
+    sufficient_light_mask = (luminance >= GOOD_THRESHOLD).astype(np.uint8)
 
     # --------------------------------------------------------------
     # Convert full-resolution quality into 8x8 target
@@ -333,24 +256,11 @@ def compute_rgb_baseline_quality(
 
     height, width = pixel_quality.shape
 
-    row_edges = np.linspace(
-        0,
-        height,
-        grid_size + 1,
-        dtype=int
-    )
+    row_edges = np.linspace(0, height, grid_size + 1, dtype=int)
 
-    col_edges = np.linspace(
-        0,
-        width,
-        grid_size + 1,
-        dtype=int
-    )
+    col_edges = np.linspace(0, width, grid_size + 1, dtype=int)
 
-    quality_map = np.zeros(
-        (grid_size, grid_size),
-        dtype=np.float32
-    )
+    quality_map = np.zeros((grid_size, grid_size), dtype=np.float32)
 
     for row in range(grid_size):
 
@@ -362,18 +272,9 @@ def compute_rgb_baseline_quality(
             x0 = col_edges[col]
             x1 = col_edges[col + 1]
 
-            patch = pixel_quality[
-                y0:y1,
-                x0:x1
-            ]
+            patch = pixel_quality[y0:y1, x0:x1]
 
             if patch.size > 0:
-                quality_map[row, col] = float(
-                    np.mean(patch)
-                )
+                quality_map[row, col] = float(np.mean(patch))
 
-    return (
-        quality_map,
-        sufficient_light_mask,
-        luminance
-    )
+    return (quality_map, sufficient_light_mask, luminance)

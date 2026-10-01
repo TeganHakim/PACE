@@ -13,8 +13,7 @@ def download_dataset():
     print(f"Downloading DroneVehicle dataset to: {download_dir}")
 
     path = kagglehub.dataset_download(
-        "brendanalvey/visdrone-dronevehicle",
-        output_dir=str(download_dir)
+        "brendanalvey/visdrone-dronevehicle", output_dir=str(download_dir)
     )
 
     print("Download/extraction complete.")

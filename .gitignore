@@ -227,3 +227,4 @@ processed_dataset/
 archive*.zip
 processed_dataset_full.zip
 full_build_output.txt
+evaluation_output.txt

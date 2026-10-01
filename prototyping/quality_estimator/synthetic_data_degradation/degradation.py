@@ -15,10 +15,10 @@ import cv2
 import numpy as np
 import random
 
-
 # ------------------------------------------------------------------
 # Mask utilities
 # ------------------------------------------------------------------
+
 
 def generate_mask(height, width, num_regions=None):
     """
@@ -31,88 +31,40 @@ def generate_mask(height, width, num_regions=None):
         H x W uint8 binary mask containing values 0 or 1.
     """
 
-    mask = np.zeros(
-        (height, width),
-        dtype=np.uint8
-    )
+    mask = np.zeros((height, width), dtype=np.uint8)
 
     if num_regions is None:
-        num_regions = random.randint(
-            1,
-            4
-        )
+        num_regions = random.randint(1, 4)
 
     for _ in range(num_regions):
 
-        cx = random.randint(
-            0,
-            width - 1
-        )
+        cx = random.randint(0, width - 1)
 
-        cy = random.randint(
-            0,
-            height - 1
-        )
+        cy = random.randint(0, height - 1)
 
-        rx = random.randint(
-            max(2, width // 30),
-            max(3, width // 5)
-        )
+        rx = random.randint(max(2, width // 30), max(3, width // 5))
 
-        ry = random.randint(
-            max(2, height // 30),
-            max(3, height // 5)
-        )
+        ry = random.randint(max(2, height // 30), max(3, height // 5))
 
         points = []
 
-        num_points = random.randint(
-            8,
-            14
-        )
+        num_points = random.randint(8, 14)
 
         for i in range(num_points):
 
-            angle = (
-                2
-                * np.pi
-                * i
-                / num_points
-            )
+            angle = 2 * np.pi * i / num_points
 
-            radius = random.uniform(
-                0.7,
-                1.3
-            )
+            radius = random.uniform(0.7, 1.3)
 
-            x = int(
-                cx
-                + rx
-                * radius
-                * np.cos(angle)
-            )
+            x = int(cx + rx * radius * np.cos(angle))
 
-            y = int(
-                cy
-                + ry
-                * radius
-                * np.sin(angle)
-            )
+            y = int(cy + ry * radius * np.sin(angle))
 
-            points.append(
-                [x, y]
-            )
+            points.append([x, y])
 
-        points = np.array(
-            points,
-            dtype=np.int32
-        )
+        points = np.array(points, dtype=np.int32)
 
-        cv2.fillPoly(
-            mask,
-            [points],
-            1
-        )
+        cv2.fillPoly(mask, [points], 1)
 
     return mask
 
@@ -132,27 +84,20 @@ def prepare_mask_for_image(mask, image):
     """
 
     if image.ndim not in (2, 3):
-        raise ValueError(
-            f"Expected a 2D or 3D image, "
-            f"got shape {image.shape}."
-        )
+        raise ValueError(f"Expected a 2D or 3D image, " f"got shape {image.shape}.")
 
     # Remove a singleton channel dimension if one was supplied.
     if mask.ndim == 3:
 
         if mask.shape[2] != 1:
             raise ValueError(
-                f"Expected a 2D mask or HxWx1 mask, "
-                f"got shape {mask.shape}."
+                f"Expected a 2D mask or HxWx1 mask, " f"got shape {mask.shape}."
             )
 
         mask = mask[:, :, 0]
 
     if mask.ndim != 2:
-        raise ValueError(
-            f"Expected a 2D mask, "
-            f"got shape {mask.shape}."
-        )
+        raise ValueError(f"Expected a 2D mask, " f"got shape {mask.shape}.")
 
     if mask.shape != image.shape[:2]:
         raise ValueError(
@@ -160,9 +105,7 @@ def prepare_mask_for_image(mask, image):
             f"image spatial shape {image.shape[:2]}."
         )
 
-    mask = (
-        mask > 0
-    ).astype(np.float32)
+    mask = (mask > 0).astype(np.float32)
 
     if image.ndim == 3:
         mask = mask[..., None]
@@ -170,11 +113,7 @@ def prepare_mask_for_image(mask, image):
     return mask
 
 
-def blend_with_mask(
-    original,
-    degraded,
-    mask
-):
+def blend_with_mask(original, degraded, mask):
     """
     Blend a degraded image into the original image using a binary mask.
 
@@ -188,124 +127,68 @@ def blend_with_mask(
             f"{degraded.shape}."
         )
 
-    blend_mask = prepare_mask_for_image(
-        mask,
-        original
-    )
+    blend_mask = prepare_mask_for_image(mask, original)
 
-    original_float = (
-        original.astype(np.float32)
-    )
+    original_float = original.astype(np.float32)
 
-    degraded_float = (
-        degraded.astype(np.float32)
-    )
+    degraded_float = degraded.astype(np.float32)
 
-    output = (
-        original_float
-        * (1.0 - blend_mask)
-        +
-        degraded_float
-        * blend_mask
-    )
+    output = original_float * (1.0 - blend_mask) + degraded_float * blend_mask
 
-    return np.clip(
-        output,
-        0,
-        255
-    ).astype(np.uint8)
+    return np.clip(output, 0, 255).astype(np.uint8)
 
 
 # ------------------------------------------------------------------
 # Water blur
 # ------------------------------------------------------------------
 
-def apply_water_blur(
-    image,
-    mask,
-    severity
-):
+
+def apply_water_blur(image, mask, severity):
     """
     Simulate water droplets, condensation, or a dirty camera lens.
 
     Supports both grayscale and multi-channel images.
     """
 
-    sigma = (
-        0.5
-        + severity * 7.0
-    )
+    sigma = 0.5 + severity * 7.0
 
-    blurred = cv2.GaussianBlur(
-        image,
-        ksize=(0, 0),
-        sigmaX=sigma
-    )
+    blurred = cv2.GaussianBlur(image, ksize=(0, 0), sigmaX=sigma)
 
-    return blend_with_mask(
-        image,
-        blurred,
-        mask
-    )
+    return blend_with_mask(image, blurred, mask)
 
 
 # ------------------------------------------------------------------
 # Motion blur
 # ------------------------------------------------------------------
 
-def apply_motion_blur(
-    image,
-    mask,
-    severity
-):
+
+def apply_motion_blur(image, mask, severity):
     """
     Simulate camera motion during image capture.
 
     Supports both grayscale and multi-channel images.
     """
 
-    size = int(
-        3
-        + severity * 18
-    )
+    size = int(3 + severity * 18)
 
     if size % 2 == 0:
         size += 1
 
-    kernel = np.zeros(
-        (size, size),
-        dtype=np.float32
-    )
+    kernel = np.zeros((size, size), dtype=np.float32)
 
-    kernel[
-        size // 2,
-        :
-    ] = (
-        1.0 / size
-    )
+    kernel[size // 2, :] = 1.0 / size
 
-    blurred = cv2.filter2D(
-        image,
-        -1,
-        kernel
-    )
+    blurred = cv2.filter2D(image, -1, kernel)
 
-    return blend_with_mask(
-        image,
-        blurred,
-        mask
-    )
+    return blend_with_mask(image, blurred, mask)
 
 
 # ------------------------------------------------------------------
 # Sensor noise
 # ------------------------------------------------------------------
 
-def apply_sensor_noise(
-    image,
-    mask,
-    severity
-):
+
+def apply_sensor_noise(image, mask, severity):
     """
     Simulate highly disruptive electronic sensor noise.
 
@@ -317,20 +200,11 @@ def apply_sensor_noise(
     Supports both grayscale and multi-channel images.
     """
 
-    sigma = (
-        severity * 60.0
-    )
+    sigma = severity * 60.0
 
-    noise = np.random.normal(
-        0,
-        sigma,
-        image.shape
-    ).astype(np.float32)
+    noise = np.random.normal(0, sigma, image.shape).astype(np.float32)
 
-    noisy = (
-        image.astype(np.float32)
-        + noise
-    )
+    noisy = image.astype(np.float32) + noise
 
     # --------------------------------------------------------------
     # Corrupted horizontal sensor lines
@@ -338,163 +212,77 @@ def apply_sensor_noise(
 
     height = image.shape[0]
 
-    num_corrupted_lines = int(
-        severity
-        * (height // 10)
-    )
+    num_corrupted_lines = int(severity * (height // 10))
 
     if num_corrupted_lines > 0:
 
-        num_corrupted_lines = min(
-            num_corrupted_lines,
-            height
-        )
+        num_corrupted_lines = min(num_corrupted_lines, height)
 
-        corrupted_rows = (
-            np.random.choice(
-                height,
-                num_corrupted_lines,
-                replace=False
-            )
-        )
+        corrupted_rows = np.random.choice(height, num_corrupted_lines, replace=False)
 
         if image.ndim == 2:
 
-            line_offsets = (
-                np.random.uniform(
-                    -100,
-                    100,
-                    size=(
-                        num_corrupted_lines,
-                        1
-                    )
-                )
-            )
+            line_offsets = np.random.uniform(-100, 100, size=(num_corrupted_lines, 1))
 
         else:
 
-            line_offsets = (
-                np.random.uniform(
-                    -100,
-                    100,
-                    size=(
-                        num_corrupted_lines,
-                        1,
-                        1
-                    )
-                )
+            line_offsets = np.random.uniform(
+                -100, 100, size=(num_corrupted_lines, 1, 1)
             )
 
-        noisy[
-            corrupted_rows,
-            ...
-        ] += line_offsets
+        noisy[corrupted_rows, ...] += line_offsets
 
     # --------------------------------------------------------------
     # Salt-and-pepper / dead-stuck pixels
     # --------------------------------------------------------------
 
-    sp_ratio = (
-        severity * 0.08
-    )
+    sp_ratio = severity * 0.08
 
-    random_matrix = (
-        np.random.random(
-            image.shape[:2]
-        )
-    )
+    random_matrix = np.random.random(image.shape[:2])
 
-    salt_mask = (
-        random_matrix
-        < (sp_ratio / 2.0)
-    )
+    salt_mask = random_matrix < (sp_ratio / 2.0)
 
-    pepper_mask = (
-        (
-            random_matrix
-            >= (sp_ratio / 2.0)
-        )
-        &
-        (
-            random_matrix
-            < sp_ratio
-        )
-    )
+    pepper_mask = (random_matrix >= (sp_ratio / 2.0)) & (random_matrix < sp_ratio)
 
     # NumPy applies the H x W boolean mask to all channels
     # automatically for H x W x C images.
     noisy[salt_mask] = 255.0
     noisy[pepper_mask] = 0.0
 
-    noisy = np.clip(
-        noisy,
-        0,
-        255
-    ).astype(np.uint8)
+    noisy = np.clip(noisy, 0, 255).astype(np.uint8)
 
-    return blend_with_mask(
-        image,
-        noisy,
-        mask
-    )
+    return blend_with_mask(image, noisy, mask)
 
 
 # ------------------------------------------------------------------
 # Saturation
 # ------------------------------------------------------------------
 
-def apply_saturation(
-    image,
-    mask,
-    severity
-):
+
+def apply_saturation(image, mask, severity):
     """
     Simulate localized sensor saturation or overexposure.
 
     Supports both grayscale and multi-channel images.
     """
 
-    output = (
-        image.astype(np.float32)
-    )
+    output = image.astype(np.float32)
 
-    amount = (
-        0.3
-        + 0.7 * severity
-    )
+    amount = 0.3 + 0.7 * severity
 
-    saturated = (
-        output
-        +
-        (
-            255.0 - output
-        )
-        * amount
-    )
+    saturated = output + (255.0 - output) * amount
 
-    saturated = np.clip(
-        saturated,
-        0,
-        255
-    ).astype(np.uint8)
+    saturated = np.clip(saturated, 0, 255).astype(np.uint8)
 
-    return blend_with_mask(
-        image,
-        saturated,
-        mask
-    )
+    return blend_with_mask(image, saturated, mask)
 
 
 # ------------------------------------------------------------------
 # Main degradation interface
 # ------------------------------------------------------------------
 
-def apply_degradation(
-    image,
-    degradation_type=None,
-    severity=None,
-    mask=None
-):
+
+def apply_degradation(image, degradation_type=None, severity=None, mask=None):
     """
     Apply one synthetic degradation to an image.
 
@@ -543,55 +331,29 @@ def apply_degradation(
     # --------------------------------------------------------------
 
     if image is None:
-        raise ValueError(
-            "Input image cannot be None."
-        )
+        raise ValueError("Input image cannot be None.")
 
     if image.ndim not in (2, 3):
-        raise ValueError(
-            f"Expected image shape HxW or HxWxC, "
-            f"got {image.shape}."
-        )
+        raise ValueError(f"Expected image shape HxW or HxWxC, " f"got {image.shape}.")
 
     if image.dtype != np.uint8:
 
-        image = np.clip(
-            image,
-            0,
-            255
-        ).astype(np.uint8)
+        image = np.clip(image, 0, 255).astype(np.uint8)
 
-    height, width = (
-        image.shape[:2]
-    )
+    height, width = image.shape[:2]
 
     # --------------------------------------------------------------
     # Degradation type
     # --------------------------------------------------------------
 
-    degradation_types = [
-        "water_blur",
-        "motion_blur",
-        "sensor_noise",
-        "saturation"
-    ]
+    degradation_types = ["water_blur", "motion_blur", "sensor_noise", "saturation"]
 
     if degradation_type is None:
 
-        degradation_type = (
-            random.choice(
-                degradation_types
-            )
-        )
+        degradation_type = random.choice(degradation_types)
 
-    if (
-        degradation_type
-        not in degradation_types
-    ):
-        raise ValueError(
-            f"Unknown degradation: "
-            f"{degradation_type}"
-        )
+    if degradation_type not in degradation_types:
+        raise ValueError(f"Unknown degradation: " f"{degradation_type}")
 
     # --------------------------------------------------------------
     # Severity
@@ -599,26 +361,12 @@ def apply_degradation(
 
     if severity is None:
 
-        severity = (
-            random.uniform(
-                0.2,
-                1.0
-            )
-        )
+        severity = random.uniform(0.2, 1.0)
 
-    severity = float(
-        severity
-    )
+    severity = float(severity)
 
-    if not (
-        0.0
-        <= severity
-        <= 1.0
-    ):
-        raise ValueError(
-            f"Severity must be in [0, 1], "
-            f"got {severity}."
-        )
+    if not (0.0 <= severity <= 1.0):
+        raise ValueError(f"Severity must be in [0, 1], " f"got {severity}.")
 
     # --------------------------------------------------------------
     # Mask
@@ -626,100 +374,49 @@ def apply_degradation(
 
     if mask is None:
 
-        mask = generate_mask(
-            height,
-            width
-        )
+        mask = generate_mask(height, width)
 
     else:
 
         # Allow H x W x 1 input, but canonicalize all metadata masks
         # to H x W.
-        if (
-            mask.ndim == 3
-            and mask.shape[2] == 1
-        ):
+        if mask.ndim == 3 and mask.shape[2] == 1:
             mask = mask[:, :, 0]
 
-        if mask.shape != (
-            height,
-            width
-        ):
+        if mask.shape != (height, width):
             raise ValueError(
                 f"Mask shape {mask.shape} "
                 f"does not match image shape "
                 f"{(height, width)}."
             )
 
-        mask = (
-            mask > 0
-        ).astype(np.uint8)
+        mask = (mask > 0).astype(np.uint8)
 
     # --------------------------------------------------------------
     # Apply degradation
     # --------------------------------------------------------------
 
-    if (
-        degradation_type
-        == "water_blur"
-    ):
+    if degradation_type == "water_blur":
 
-        output = (
-            apply_water_blur(
-                image,
-                mask,
-                severity
-            )
-        )
+        output = apply_water_blur(image, mask, severity)
 
-    elif (
-        degradation_type
-        == "motion_blur"
-    ):
+    elif degradation_type == "motion_blur":
 
-        output = (
-            apply_motion_blur(
-                image,
-                mask,
-                severity
-            )
-        )
+        output = apply_motion_blur(image, mask, severity)
 
-    elif (
-        degradation_type
-        == "sensor_noise"
-    ):
+    elif degradation_type == "sensor_noise":
 
-        output = (
-            apply_sensor_noise(
-                image,
-                mask,
-                severity
-            )
-        )
+        output = apply_sensor_noise(image, mask, severity)
 
-    elif (
-        degradation_type
-        == "saturation"
-    ):
+    elif degradation_type == "saturation":
 
-        output = (
-            apply_saturation(
-                image,
-                mask,
-                severity
-            )
-        )
+        output = apply_saturation(image, mask, severity)
 
     # --------------------------------------------------------------
     # Final validation
     # --------------------------------------------------------------
 
-    output = np.clip(
-        output,
-        0,
-        255
-    ).astype(np.uint8)
+    output = np.clip(output, 0, 255).astype(np.uint8)
 
     if output.shape != image.shape:
         raise RuntimeError(
@@ -732,13 +429,6 @@ def apply_degradation(
     # Metadata
     # --------------------------------------------------------------
 
-    metadata = {
-        "type": degradation_type,
-        "severity": severity,
-        "mask": mask
-    }
+    metadata = {"type": degradation_type, "severity": severity, "mask": mask}
 
-    return (
-        output,
-        metadata
-    )
+    return (output, metadata)

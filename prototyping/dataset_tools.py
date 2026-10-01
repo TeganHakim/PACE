@@ -8,6 +8,7 @@ A sample is the RGB image, IR image, RGB label and IR label that share a
 filename stem. If any image is corrupt, all four are deleted so no
 incomplete sample is left behind.
 """
+
 import argparse
 import os
 from os.path import isdir, join, splitext
@@ -16,7 +17,7 @@ import cv2
 
 DEFAULT_ROOT = "../VisDrone-DroneVehicle"
 SPLITS = ("train", "val", "test")
-IMG_EXTS = ('.jpg')
+IMG_EXTS = ".jpg"
 
 
 def bad_file_path(root):
@@ -36,19 +37,26 @@ def check(root):
                 print("Missing folder:", folder)
                 continue
 
-            files = sorted(f for f in os.listdir(folder) if f.lower().endswith(IMG_EXTS))
+            files = sorted(
+                f for f in os.listdir(folder) if f.lower().endswith(IMG_EXTS)
+            )
             print("Checking {} ({} files)".format(folder, len(files)))
 
             for f in files:
                 path = join(folder, f)
-                if os.path.getsize(path) == 0 or cv2.imread(path, cv2.IMREAD_GRAYSCALE) is None:
+                if (
+                    os.path.getsize(path) == 0
+                    or cv2.imread(path, cv2.IMREAD_GRAYSCALE) is None
+                ):
                     print("  BAD:", path)
                     bad.add("{}/{}".format(split, f))
 
     with open(bad_file_path(root), "w") as fh:
         fh.write("\n".join(sorted(bad)) + ("\n" if bad else ""))
 
-    print("Done. {} bad image name(s) written to {}".format(len(bad), bad_file_path(root)))
+    print(
+        "Done. {} bad image name(s) written to {}".format(len(bad), bad_file_path(root))
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +115,9 @@ def delete(root, yes=False):
         print("\nNothing to delete.")
         return
 
-    print("\n{} files across {} samples will be deleted.".format(len(to_delete), samples))
+    print(
+        "\n{} files across {} samples will be deleted.".format(len(to_delete), samples)
+    )
 
     if not yes and input("Type 'yes' to continue: ").strip().lower() != "yes":
         print("Cancelled, nothing deleted.")
@@ -117,21 +127,31 @@ def delete(root, yes=False):
         os.remove(path)
 
     os.rename(bad_file, bad_file + ".done")
-    print("Deleted {} files. Renamed bad_images.txt to bad_images.txt.done".format(len(to_delete)))
+    print(
+        "Deleted {} files. Renamed bad_images.txt to bad_images.txt.done".format(
+            len(to_delete)
+        )
+    )
 
 
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Find and remove corrupt DroneVehicle samples.")
+    parser = argparse.ArgumentParser(
+        description="Find and remove corrupt DroneVehicle samples."
+    )
     sub = parser.add_subparsers(dest="command")
     sub.required = True
 
     p_check = sub.add_parser("check", help="scan images and write bad_images.txt")
     p_check.add_argument("root", nargs="?", default=DEFAULT_ROOT)
 
-    p_delete = sub.add_parser("delete", help="delete all four parts of every sample in bad_images.txt")
+    p_delete = sub.add_parser(
+        "delete", help="delete all four parts of every sample in bad_images.txt"
+    )
     p_delete.add_argument("root", nargs="?", default=DEFAULT_ROOT)
-    p_delete.add_argument("--yes", action="store_true", help="skip the confirmation prompt")
+    p_delete.add_argument(
+        "--yes", action="store_true", help="skip the confirmation prompt"
+    )
 
     args = parser.parse_args()
 

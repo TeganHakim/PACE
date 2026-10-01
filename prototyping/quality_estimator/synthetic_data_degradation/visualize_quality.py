@@ -19,7 +19,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Rectangle
 
-
 PROCESSED_ROOT = Path("processed_dataset")
 GRID_SIZE = 8
 
@@ -27,6 +26,7 @@ GRID_SIZE = 8
 # ------------------------------------------------------------------
 # XML loading
 # ------------------------------------------------------------------
+
 
 def load_boxes(xml_path):
     """
@@ -47,11 +47,7 @@ def load_boxes(xml_path):
 
         name_node = obj.find("name")
 
-        class_name = (
-            name_node.text
-            if name_node is not None
-            else "object"
-        )
+        class_name = name_node.text if name_node is not None else "object"
 
         polygon = obj.find("polygon")
 
@@ -66,10 +62,10 @@ def load_boxes(xml_path):
             y_node = polygon.find(f"y{i}")
 
             if (
-                x_node is None or
-                y_node is None or
-                x_node.text is None or
-                y_node.text is None
+                x_node is None
+                or y_node is None
+                or x_node.text is None
+                or y_node.text is None
             ):
                 continue
 
@@ -84,13 +80,15 @@ def load_boxes(xml_path):
         xs = [point[0] for point in points]
         ys = [point[1] for point in points]
 
-        boxes.append({
-            "x1": min(xs),
-            "y1": min(ys),
-            "x2": max(xs),
-            "y2": max(ys),
-            "class_name": class_name,
-        })
+        boxes.append(
+            {
+                "x1": min(xs),
+                "y1": min(ys),
+                "x2": max(xs),
+                "y2": max(ys),
+                "class_name": class_name,
+            }
+        )
 
     return boxes
 
@@ -99,11 +97,8 @@ def load_boxes(xml_path):
 # Quality overlay
 # ------------------------------------------------------------------
 
-def draw_quality_overlay(
-    ax,
-    image,
-    quality
-):
+
+def draw_quality_overlay(ax, image, quality):
     """
     Draw image with 8x8 quality grid and values.
     """
@@ -112,19 +107,9 @@ def draw_quality_overlay(
 
     ax.imshow(image)
 
-    row_edges = np.linspace(
-        0,
-        height,
-        GRID_SIZE + 1,
-        dtype=int
-    )
+    row_edges = np.linspace(0, height, GRID_SIZE + 1, dtype=int)
 
-    col_edges = np.linspace(
-        0,
-        width,
-        GRID_SIZE + 1,
-        dtype=int
-    )
+    col_edges = np.linspace(0, width, GRID_SIZE + 1, dtype=int)
 
     # --------------------------------------------------------------
     # Grid
@@ -132,19 +117,11 @@ def draw_quality_overlay(
 
     for y in row_edges:
 
-        ax.plot(
-            [-0.5, width - 0.5],
-            [y - 0.5, y - 0.5],
-            linewidth=1
-        )
+        ax.plot([-0.5, width - 0.5], [y - 0.5, y - 0.5], linewidth=1)
 
     for x in col_edges:
 
-        ax.plot(
-            [x - 0.5, x - 0.5],
-            [-0.5, height - 0.5],
-            linewidth=1
-        )
+        ax.plot([x - 0.5, x - 0.5], [-0.5, height - 0.5], linewidth=1)
 
     # --------------------------------------------------------------
     # Quality values
@@ -154,15 +131,9 @@ def draw_quality_overlay(
 
         for col in range(GRID_SIZE):
 
-            x_center = (
-                col_edges[col] +
-                col_edges[col + 1]
-            ) / 2
+            x_center = (col_edges[col] + col_edges[col + 1]) / 2
 
-            y_center = (
-                row_edges[row] +
-                row_edges[row + 1]
-            ) / 2
+            y_center = (row_edges[row] + row_edges[row + 1]) / 2
 
             ax.text(
                 x_center,
@@ -172,23 +143,12 @@ def draw_quality_overlay(
                 va="center",
                 fontsize=8,
                 fontweight="bold",
-                bbox=dict(
-                    facecolor="white",
-                    alpha=0.7,
-                    edgecolor="none",
-                    pad=1.5
-                )
+                bbox=dict(facecolor="white", alpha=0.7, edgecolor="none", pad=1.5),
             )
 
-    ax.set_xlim(
-        -0.5,
-        width - 0.5
-    )
+    ax.set_xlim(-0.5, width - 0.5)
 
-    ax.set_ylim(
-        height - 0.5,
-        -0.5
-    )
+    ax.set_ylim(height - 0.5, -0.5)
 
     ax.set_aspect("equal")
 
@@ -197,11 +157,8 @@ def draw_quality_overlay(
 # Bounding-box overlay
 # ------------------------------------------------------------------
 
-def draw_boxes(
-    ax,
-    image,
-    boxes
-):
+
+def draw_boxes(ax, image, boxes):
     """
     Draw adjusted XML bounding boxes over image.
     """
@@ -220,13 +177,7 @@ def draw_boxes(
         box_width = x2 - x1
         box_height = y2 - y1
 
-        rect = Rectangle(
-            (x1, y1),
-            box_width,
-            box_height,
-            fill=False,
-            linewidth=1.5
-        )
+        rect = Rectangle((x1, y1), box_width, box_height, fill=False, linewidth=1.5)
 
         ax.add_patch(rect)
 
@@ -235,23 +186,12 @@ def draw_boxes(
             max(y1 - 3, 5),
             box["class_name"],
             fontsize=7,
-            bbox=dict(
-                facecolor="white",
-                alpha=0.7,
-                edgecolor="none",
-                pad=1
-            )
+            bbox=dict(facecolor="white", alpha=0.7, edgecolor="none", pad=1),
         )
 
-    ax.set_xlim(
-        -0.5,
-        width - 0.5
-    )
+    ax.set_xlim(-0.5, width - 0.5)
 
-    ax.set_ylim(
-        height - 0.5,
-        -0.5
-    )
+    ax.set_ylim(height - 0.5, -0.5)
 
     ax.set_aspect("equal")
 
@@ -260,104 +200,64 @@ def draw_boxes(
 # Main visualization
 # ------------------------------------------------------------------
 
-def visualize_quality(
-    pair_id,
-    modality
-):
+
+def visualize_quality(pair_id, modality):
 
     modality = modality.lower()
 
-    if modality not in (
-        "rgb",
-        "ir"
-    ):
-        raise ValueError(
-            "modality must be 'rgb' or 'ir'"
-        )
+    if modality not in ("rgb", "ir"):
+        raise ValueError("modality must be 'rgb' or 'ir'")
 
     # --------------------------------------------------------------
     # Paths
     # --------------------------------------------------------------
 
-    image_path = (
-        PROCESSED_ROOT /
-        modality /
-        f"{pair_id}.jpg"
-    )
+    image_path = PROCESSED_ROOT / "train" / modality / f"{pair_id}.jpg"
 
     quality_path = (
-        PROCESSED_ROOT /
-        "quality_maps" /
-        f"{pair_id}_{modality}.npy"
+        PROCESSED_ROOT / "train" / "quality_maps" / f"{pair_id}_{modality}.npy"
     )
 
     if modality == "rgb":
 
-        xml_path = (
-            PROCESSED_ROOT /
-            "rgb_annotations" /
-            f"{pair_id}.xml"
-        )
+        xml_path = PROCESSED_ROOT / "train" / "rgb_annotations" / f"{pair_id}.xml"
 
     else:
 
-        xml_path = (
-            PROCESSED_ROOT /
-            "ir_annotations" /
-            f"{pair_id}.xml"
-        )
+        xml_path = PROCESSED_ROOT / "train" / "ir_annotations" / f"{pair_id}.xml"
 
     # --------------------------------------------------------------
     # Validate paths
     # --------------------------------------------------------------
 
     if not image_path.exists():
-        raise FileNotFoundError(
-            image_path
-        )
+        raise FileNotFoundError(image_path)
 
     if not quality_path.exists():
-        raise FileNotFoundError(
-            quality_path
-        )
+        raise FileNotFoundError(quality_path)
 
     if not xml_path.exists():
-        raise FileNotFoundError(
-            xml_path
-        )
+        raise FileNotFoundError(xml_path)
 
     # --------------------------------------------------------------
     # Load image
     # --------------------------------------------------------------
 
-    image = cv2.imread(
-        str(image_path)
-    )
+    image = cv2.imread(str(image_path))
 
     if image is None:
 
-        raise ValueError(
-            f"Could not load "
-            f"{image_path}"
-        )
+        raise ValueError(f"Could not load " f"{image_path}")
 
-    image = cv2.cvtColor(
-        image,
-        cv2.COLOR_BGR2RGB
-    )
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
     # --------------------------------------------------------------
     # Load quality map
     # --------------------------------------------------------------
 
-    quality = np.load(
-        quality_path
-    )
+    quality = np.load(quality_path)
 
-    if quality.shape != (
-        GRID_SIZE,
-        GRID_SIZE
-    ):
+    if quality.shape != (GRID_SIZE, GRID_SIZE):
 
         raise ValueError(
             f"Expected "
@@ -370,138 +270,75 @@ def visualize_quality(
     # Load XML annotations
     # --------------------------------------------------------------
 
-    boxes = load_boxes(
-        xml_path
-    )
+    boxes = load_boxes(xml_path)
 
-    height, width = (
-        image.shape[:2]
-    )
+    height, width = image.shape[:2]
 
     # --------------------------------------------------------------
     # Print diagnostics
     # --------------------------------------------------------------
 
-    print(
-        f"Image: {image_path}"
-    )
+    print(f"Image: {image_path}")
 
-    print(
-        f"Image shape: "
-        f"{image.shape}"
-    )
+    print(f"Image shape: " f"{image.shape}")
 
-    print(
-        f"Quality map: "
-        f"{quality_path}"
-    )
+    print(f"Quality map: " f"{quality_path}")
 
-    print(
-        f"Quality shape: "
-        f"{quality.shape}"
-    )
+    print(f"Quality shape: " f"{quality.shape}")
 
-    print(
-        f"Quality range: "
-        f"{quality.min():.3f} - "
-        f"{quality.max():.3f}"
-    )
+    print(f"Quality range: " f"{quality.min():.3f} - " f"{quality.max():.3f}")
 
-    print(
-        f"XML: {xml_path}"
-    )
+    print(f"XML: {xml_path}")
 
-    print(
-        f"Bounding boxes: "
-        f"{len(boxes)}"
-    )
+    print(f"Bounding boxes: " f"{len(boxes)}")
 
     # --------------------------------------------------------------
     # Three-panel display
     # --------------------------------------------------------------
 
-    fig, axes = plt.subplots(
-        1,
-        3,
-        figsize=(21, 7)
-    )
+    fig, axes = plt.subplots(1, 3, figsize=(21, 7))
 
     # --------------------------------------------------------------
     # Panel 1: image only
     # --------------------------------------------------------------
 
-    axes[0].imshow(
-        image
-    )
+    axes[0].imshow(image)
 
-    axes[0].set_title(
-        "Processed Image"
-    )
+    axes[0].set_title("Processed Image")
 
-    axes[0].set_xlim(
-        -0.5,
-        width - 0.5
-    )
+    axes[0].set_xlim(-0.5, width - 0.5)
 
-    axes[0].set_ylim(
-        height - 0.5,
-        -0.5
-    )
+    axes[0].set_ylim(height - 0.5, -0.5)
 
-    axes[0].set_aspect(
-        "equal"
-    )
+    axes[0].set_aspect("equal")
 
-    axes[0].axis(
-        "off"
-    )
+    axes[0].axis("off")
 
     # --------------------------------------------------------------
     # Panel 2: quality map
     # --------------------------------------------------------------
 
-    draw_quality_overlay(
-        axes[1],
-        image,
-        quality
-    )
+    draw_quality_overlay(axes[1], image, quality)
 
-    axes[1].set_title(
-        "Quality Map"
-    )
+    axes[1].set_title("Quality Map")
 
-    axes[1].axis(
-        "off"
-    )
+    axes[1].axis("off")
 
     # --------------------------------------------------------------
     # Panel 3: bounding boxes
     # --------------------------------------------------------------
 
-    draw_boxes(
-        axes[2],
-        image,
-        boxes
-    )
+    draw_boxes(axes[2], image, boxes)
 
-    axes[2].set_title(
-        f"XML Bounding Boxes "
-        f"({len(boxes)} objects)"
-    )
+    axes[2].set_title(f"XML Bounding Boxes " f"({len(boxes)} objects)")
 
-    axes[2].axis(
-        "off"
-    )
+    axes[2].axis("off")
 
     # --------------------------------------------------------------
     # Overall title
     # --------------------------------------------------------------
 
-    fig.suptitle(
-        f"Pair {pair_id} — "
-        f"{modality.upper()}",
-        fontsize=16
-    )
+    fig.suptitle(f"Pair {pair_id} — " f"{modality.upper()}", fontsize=16)
 
     plt.tight_layout()
 
@@ -512,36 +349,22 @@ def visualize_quality(
 # CLI
 # ------------------------------------------------------------------
 
+
 def main():
 
     parser = argparse.ArgumentParser(
         description=(
-            "Visualize processed image, "
-            "quality labels, and XML annotations."
+            "Visualize processed image, " "quality labels, and XML annotations."
         )
     )
 
-    parser.add_argument(
-        "pair_id",
-        help=(
-            "Pair ID, e.g. 00004"
-        )
-    )
+    parser.add_argument("pair_id", help=("Pair ID, e.g. 00004"))
 
-    parser.add_argument(
-        "modality",
-        choices=[
-            "rgb",
-            "ir"
-        ]
-    )
+    parser.add_argument("modality", choices=["rgb", "ir"])
 
     args = parser.parse_args()
 
-    visualize_quality(
-        args.pair_id,
-        args.modality
-    )
+    visualize_quality(args.pair_id, args.modality)
 
 
 # ------------------------------------------------------------------

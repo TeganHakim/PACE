@@ -30,7 +30,6 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-
 # ------------------------------------------------------------------
 # Configuration
 # ------------------------------------------------------------------
@@ -53,21 +52,18 @@ GOOD_THRESHOLD = 0.15
 # General helpers
 # ------------------------------------------------------------------
 
+
 def load_metadata():
     """Load generated metadata.csv."""
 
     if not METADATA_PATH.exists():
-        raise FileNotFoundError(
-            f"Metadata not found: {METADATA_PATH}"
-        )
+        raise FileNotFoundError(f"Metadata not found: {METADATA_PATH}")
 
     with open(METADATA_PATH, newline="") as file:
         rows = list(csv.DictReader(file))
 
     if not rows:
-        raise ValueError(
-            "metadata.csv contains no samples."
-        )
+        raise ValueError("metadata.csv contains no samples.")
 
     return rows
 
@@ -82,18 +78,14 @@ def apply_crop(image, border_pixels=BORDER_PIXELS):
 
     height, width = image.shape[:2]
 
-    if (
-        height <= 2 * border_pixels
-        or width <= 2 * border_pixels
-    ):
+    if height <= 2 * border_pixels or width <= 2 * border_pixels:
         raise ValueError(
             f"Image shape {image.shape} is too small "
             f"for a {border_pixels}px border crop."
         )
 
     return image[
-        border_pixels:height - border_pixels,
-        border_pixels:width - border_pixels
+        border_pixels : height - border_pixels, border_pixels : width - border_pixels
     ]
 
 
@@ -110,11 +102,7 @@ def compute_luminance(image):
     g = image[:, :, 1]
     r = image[:, :, 2]
 
-    luminance = (
-        0.2126 * r
-        + 0.7152 * g
-        + 0.0722 * b
-    )
+    luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
 
     return luminance
 
@@ -122,10 +110,7 @@ def compute_luminance(image):
 def describe(values):
     """Return summary statistics for a sequence."""
 
-    values = np.asarray(
-        values,
-        dtype=np.float32
-    )
+    values = np.asarray(values, dtype=np.float32)
 
     if values.size == 0:
         return None
@@ -171,15 +156,13 @@ def print_description(title, values):
     ]
 
     for key in keys:
-        print(
-            f"{key:>7}: "
-            f"{stats[key]:.4f}"
-        )
+        print(f"{key:>7}: " f"{stats[key]:.4f}")
 
 
 # ------------------------------------------------------------------
 # Main evaluation
 # ------------------------------------------------------------------
+
 
 def evaluate_dataset():
 
@@ -189,10 +172,7 @@ def evaluate_dataset():
     print("PACE SYNTHETIC DATASET EVALUATION")
     print("=" * 70)
 
-    print(
-        f"\nSamples in metadata: "
-        f"{len(rows)}"
-    )
+    print(f"\nSamples in metadata: " f"{len(rows)}")
 
     print(
         f"Lighting thresholds under evaluation: "
@@ -225,10 +205,7 @@ def evaluate_dataset():
     # Process samples
     # ==============================================================
 
-    for index, row in enumerate(
-        rows,
-        start=1
-    ):
+    for index, row in enumerate(rows, start=1):
 
         pair_id = row["pair_id"]
 
@@ -237,14 +214,9 @@ def evaluate_dataset():
         # Evaluate lighting from ORIGINAL source RGB, not degraded RGB
         # ----------------------------------------------------------
 
-        source_rgb_path = Path(
-            row["source_rgb"]
-        )
+        source_rgb_path = Path(row["source_rgb"])
 
-        source_rgb = cv2.imread(
-            str(source_rgb_path),
-            cv2.IMREAD_COLOR
-        )
+        source_rgb = cv2.imread(str(source_rgb_path), cv2.IMREAD_COLOR)
 
         if source_rgb is None:
 
@@ -253,63 +225,37 @@ def evaluate_dataset():
                 f"for {pair_id}: {source_rgb_path}"
             )
 
-            skipped_samples.append(
-                pair_id
-            )
+            skipped_samples.append(pair_id)
 
             continue
 
-        source_rgb = apply_crop(
-            source_rgb
-        )
+        source_rgb = apply_crop(source_rgb)
 
-        luminance = compute_luminance(
-            source_rgb
-        )
+        luminance = compute_luminance(source_rgb)
 
         # ----------------------------------------------------------
         # Lighting statistics
         # ----------------------------------------------------------
 
-        mean_luminance = float(
-            np.mean(luminance)
-        )
+        mean_luminance = float(np.mean(luminance))
 
-        median_luminance = float(
-            np.median(luminance)
-        )
+        median_luminance = float(np.median(luminance))
 
-        dark_fraction = float(
-            np.mean(
-                luminance <= DARK_THRESHOLD
-            )
-        )
+        dark_fraction = float(np.mean(luminance <= DARK_THRESHOLD))
 
-        good_fraction = float(
-            np.mean(
-                luminance >= GOOD_THRESHOLD
-            )
-        )
+        good_fraction = float(np.mean(luminance >= GOOD_THRESHOLD))
 
         intermediate_fraction = float(
-            np.mean(
-                (luminance > DARK_THRESHOLD)
-                &
-                (luminance < GOOD_THRESHOLD)
-            )
+            np.mean((luminance > DARK_THRESHOLD) & (luminance < GOOD_THRESHOLD))
         )
 
         # ----------------------------------------------------------
         # Load quality maps
         # ----------------------------------------------------------
 
-        rgb_quality_path = Path(
-            row["rgb_quality"]
-        )
+        rgb_quality_path = Path(row["rgb_quality"])
 
-        ir_quality_path = Path(
-            row["ir_quality"]
-        )
+        ir_quality_path = Path(row["ir_quality"])
 
         if not rgb_quality_path.exists():
 
@@ -318,37 +264,25 @@ def evaluate_dataset():
                 f"for {pair_id}: {rgb_quality_path}"
             )
 
-            skipped_samples.append(
-                pair_id
-            )
+            skipped_samples.append(pair_id)
 
             continue
 
         if not ir_quality_path.exists():
 
             print(
-                f"WARNING: missing IR quality map "
-                f"for {pair_id}: {ir_quality_path}"
+                f"WARNING: missing IR quality map " f"for {pair_id}: {ir_quality_path}"
             )
 
-            skipped_samples.append(
-                pair_id
-            )
+            skipped_samples.append(pair_id)
 
             continue
 
-        rgb_quality = np.load(
-            rgb_quality_path
-        )
+        rgb_quality = np.load(rgb_quality_path)
 
-        ir_quality = np.load(
-            ir_quality_path
-        )
+        ir_quality = np.load(ir_quality_path)
 
-        if rgb_quality.shape != (
-            GRID_SIZE,
-            GRID_SIZE
-        ):
+        if rgb_quality.shape != (GRID_SIZE, GRID_SIZE):
 
             raise ValueError(
                 f"{pair_id} RGB quality map "
@@ -356,10 +290,7 @@ def evaluate_dataset():
                 f"expected ({GRID_SIZE}, {GRID_SIZE})."
             )
 
-        if ir_quality.shape != (
-            GRID_SIZE,
-            GRID_SIZE
-        ):
+        if ir_quality.shape != (GRID_SIZE, GRID_SIZE):
 
             raise ValueError(
                 f"{pair_id} IR quality map "
@@ -371,74 +302,40 @@ def evaluate_dataset():
         # Record sample statistics
         # ----------------------------------------------------------
 
-        valid_pair_ids.append(
-            pair_id
-        )
+        valid_pair_ids.append(pair_id)
 
-        image_mean_luminances.append(
-            mean_luminance
-        )
+        image_mean_luminances.append(mean_luminance)
 
-        image_median_luminances.append(
-            median_luminance
-        )
+        image_median_luminances.append(median_luminance)
 
-        dark_pixel_fractions.append(
-            dark_fraction
-        )
+        dark_pixel_fractions.append(dark_fraction)
 
-        good_pixel_fractions.append(
-            good_fraction
-        )
+        good_pixel_fractions.append(good_fraction)
 
-        intermediate_pixel_fractions.append(
-            intermediate_fraction
-        )
+        intermediate_pixel_fractions.append(intermediate_fraction)
 
-        rgb_quality_values.extend(
-            rgb_quality.flatten().tolist()
-        )
+        rgb_quality_values.extend(rgb_quality.flatten().tolist())
 
-        ir_quality_values.extend(
-            ir_quality.flatten().tolist()
-        )
+        ir_quality_values.extend(ir_quality.flatten().tolist())
 
-        rgb_image_mean_quality.append(
-            float(
-                np.mean(rgb_quality)
-            )
-        )
+        rgb_image_mean_quality.append(float(np.mean(rgb_quality)))
 
-        ir_image_mean_quality.append(
-            float(
-                np.mean(ir_quality)
-            )
-        )
+        ir_image_mean_quality.append(float(np.mean(ir_quality)))
 
         if index % 100 == 0:
-            print(
-                f"Processed {index}/{len(rows)}"
-            )
+            print(f"Processed {index}/{len(rows)}")
 
     # ==============================================================
     # Basic validation
     # ==============================================================
 
     if not valid_pair_ids:
-        raise ValueError(
-            "No valid samples could be evaluated."
-        )
+        raise ValueError("No valid samples could be evaluated.")
 
-    print(
-        f"\nSuccessfully evaluated: "
-        f"{len(valid_pair_ids)}"
-    )
+    print(f"\nSuccessfully evaluated: " f"{len(valid_pair_ids)}")
 
     if skipped_samples:
-        print(
-            f"Skipped samples: "
-            f"{len(skipped_samples)}"
-        )
+        print(f"Skipped samples: " f"{len(skipped_samples)}")
 
     # ==============================================================
     # 1. RGB lighting distribution
@@ -449,31 +346,22 @@ def evaluate_dataset():
     print("1. ORIGINAL RGB LIGHTING DISTRIBUTION")
     print("=" * 70)
 
+    print_description("Mean luminance per image", image_mean_luminances)
+
+    print_description("Median luminance per image", image_median_luminances)
+
     print_description(
-        "Mean luminance per image",
-        image_mean_luminances
+        f"Fraction of pixels <= DARK_THRESHOLD " f"({DARK_THRESHOLD:.2f})",
+        dark_pixel_fractions,
     )
 
     print_description(
-        "Median luminance per image",
-        image_median_luminances
+        f"Fraction of pixels >= GOOD_THRESHOLD " f"({GOOD_THRESHOLD:.2f})",
+        good_pixel_fractions,
     )
 
     print_description(
-        f"Fraction of pixels <= DARK_THRESHOLD "
-        f"({DARK_THRESHOLD:.2f})",
-        dark_pixel_fractions
-    )
-
-    print_description(
-        f"Fraction of pixels >= GOOD_THRESHOLD "
-        f"({GOOD_THRESHOLD:.2f})",
-        good_pixel_fractions
-    )
-
-    print_description(
-        "Fraction of intermediate-light pixels",
-        intermediate_pixel_fractions
+        "Fraction of intermediate-light pixels", intermediate_pixel_fractions
     )
 
     # ==============================================================
@@ -485,71 +373,30 @@ def evaluate_dataset():
     print("2. RGB QUALITY DISTRIBUTION")
     print("=" * 70)
 
-    rgb_values = np.asarray(
-        rgb_quality_values,
-        dtype=np.float32
-    )
+    rgb_values = np.asarray(rgb_quality_values, dtype=np.float32)
 
-    print_description(
-        "All RGB 8x8 quality values",
-        rgb_values
-    )
+    print_description("All RGB 8x8 quality values", rgb_values)
 
-    pct_very_low = float(
-        np.mean(
-            rgb_values <= 0.10
-        )
-    )
+    pct_very_low = float(np.mean(rgb_values <= 0.10))
 
-    pct_low = float(
-        np.mean(
-            (rgb_values > 0.10)
-            &
-            (rgb_values < 0.50)
-        )
-    )
+    pct_low = float(np.mean((rgb_values > 0.10) & (rgb_values < 0.50)))
 
-    pct_medium = float(
-        np.mean(
-            (rgb_values >= 0.50)
-            &
-            (rgb_values < 0.90)
-        )
-    )
+    pct_medium = float(np.mean((rgb_values >= 0.50) & (rgb_values < 0.90)))
 
-    pct_high = float(
-        np.mean(
-            rgb_values >= 0.90
-        )
-    )
+    pct_high = float(np.mean(rgb_values >= 0.90))
 
     print()
     print("RGB patch categories:")
 
-    print(
-        f"  quality <= 0.10:  "
-        f"{pct_very_low:.2%}"
-    )
+    print(f"  quality <= 0.10:  " f"{pct_very_low:.2%}")
 
-    print(
-        f"  quality 0.10-0.50: "
-        f"{pct_low:.2%}"
-    )
+    print(f"  quality 0.10-0.50: " f"{pct_low:.2%}")
 
-    print(
-        f"  quality 0.50-0.90: "
-        f"{pct_medium:.2%}"
-    )
+    print(f"  quality 0.50-0.90: " f"{pct_medium:.2%}")
 
-    print(
-        f"  quality >= 0.90:   "
-        f"{pct_high:.2%}"
-    )
+    print(f"  quality >= 0.90:   " f"{pct_high:.2%}")
 
-    print_description(
-        "Mean RGB quality per image",
-        rgb_image_mean_quality
-    )
+    print_description("Mean RGB quality per image", rgb_image_mean_quality)
 
     # ==============================================================
     # 3. IR quality distribution
@@ -560,34 +407,15 @@ def evaluate_dataset():
     print("3. IR QUALITY DISTRIBUTION")
     print("=" * 70)
 
-    ir_values = np.asarray(
-        ir_quality_values,
-        dtype=np.float32
-    )
+    ir_values = np.asarray(ir_quality_values, dtype=np.float32)
 
-    print_description(
-        "All IR 8x8 quality values",
-        ir_values
-    )
+    print_description("All IR 8x8 quality values", ir_values)
 
-    ir_perfect_fraction = float(
-        np.mean(
-            np.isclose(
-                ir_values,
-                1.0
-            )
-        )
-    )
+    ir_perfect_fraction = float(np.mean(np.isclose(ir_values, 1.0)))
 
-    print(
-        f"\nIR patches at exactly 1.0: "
-        f"{ir_perfect_fraction:.2%}"
-    )
+    print(f"\nIR patches at exactly 1.0: " f"{ir_perfect_fraction:.2%}")
 
-    print_description(
-        "Mean IR quality per image",
-        ir_image_mean_quality
-    )
+    print_description("Mean IR quality per image", ir_image_mean_quality)
 
     # ==============================================================
     # 4. Synthetic degradation distribution
@@ -598,35 +426,15 @@ def evaluate_dataset():
     print("4. SYNTHETIC DEGRADATION DISTRIBUTION")
     print("=" * 70)
 
-    degraded_rows = [
-        row
-        for row in rows
-        if row["degraded"].strip().lower()
-        == "true"
-    ]
+    degraded_rows = [row for row in rows if row["degraded"].strip().lower() == "true"]
 
-    clean_rows = [
-        row
-        for row in rows
-        if row["degraded"].strip().lower()
-        != "true"
-    ]
+    clean_rows = [row for row in rows if row["degraded"].strip().lower() != "true"]
 
-    clean_fraction = (
-        len(clean_rows) /
-        len(rows)
-    )
+    clean_fraction = len(clean_rows) / len(rows)
 
-    degraded_fraction = (
-        len(degraded_rows) /
-        len(rows)
-    )
+    degraded_fraction = len(degraded_rows) / len(rows)
 
-    print(
-        f"\nClean examples: "
-        f"{len(clean_rows)} "
-        f"({clean_fraction:.2%})"
-    )
+    print(f"\nClean examples: " f"{len(clean_rows)} " f"({clean_fraction:.2%})")
 
     print(
         f"Actually degraded examples: "
@@ -638,100 +446,56 @@ def evaluate_dataset():
     # Modality distribution
     # --------------------------------------------------------------
 
-    modality_counts = Counter(
-        row["modality"]
-        for row in degraded_rows
-    )
+    modality_counts = Counter(row["modality"] for row in degraded_rows)
 
     print()
     print("Degraded modalities:")
 
-    num_degraded = max(
-        len(degraded_rows),
-        1
-    )
+    num_degraded = max(len(degraded_rows), 1)
 
-    for modality in sorted(
-        modality_counts
-    ):
+    for modality in sorted(modality_counts):
 
-        count = modality_counts[
-            modality
-        ]
+        count = modality_counts[modality]
 
-        fraction = (
-            count /
-            num_degraded
-        )
+        fraction = count / num_degraded
 
-        print(
-            f"  {modality}: "
-            f"{count} "
-            f"({fraction:.2%})"
-        )
+        print(f"  {modality}: " f"{count} " f"({fraction:.2%})")
 
     # --------------------------------------------------------------
     # Degradation-type distribution
     # --------------------------------------------------------------
 
-    type_counts = Counter(
-        row["degradation_type"]
-        for row in degraded_rows
-    )
+    type_counts = Counter(row["degradation_type"] for row in degraded_rows)
 
     print()
     print("Degradation types:")
 
-    for degradation_type in sorted(
-        type_counts
-    ):
+    for degradation_type in sorted(type_counts):
 
-        count = type_counts[
-            degradation_type
-        ]
+        count = type_counts[degradation_type]
 
-        fraction = (
-            count /
-            num_degraded
-        )
+        fraction = count / num_degraded
 
-        print(
-            f"  {degradation_type}: "
-            f"{count} "
-            f"({fraction:.2%})"
-        )
+        print(f"  {degradation_type}: " f"{count} " f"({fraction:.2%})")
 
     # --------------------------------------------------------------
     # Modality + type combinations
     # --------------------------------------------------------------
 
     combination_counts = Counter(
-        (
-            row["modality"],
-            row["degradation_type"]
-        )
-        for row in degraded_rows
+        (row["modality"], row["degradation_type"]) for row in degraded_rows
     )
 
     print()
     print("Modality / degradation combinations:")
 
-    for combination in sorted(
-        combination_counts
-    ):
+    for combination in sorted(combination_counts):
 
-        modality, degradation_type = (
-            combination
-        )
+        modality, degradation_type = combination
 
-        count = combination_counts[
-            combination
-        ]
+        count = combination_counts[combination]
 
-        fraction = (
-            count /
-            num_degraded
-        )
+        fraction = count / num_degraded
 
         print(
             f"  {modality:<3} / "
@@ -746,17 +510,9 @@ def evaluate_dataset():
 
     if degraded_rows:
 
-        severities = [
-            float(
-                row["severity"]
-            )
-            for row in degraded_rows
-        ]
+        severities = [float(row["severity"]) for row in degraded_rows]
 
-        print_description(
-            "Degradation severity",
-            severities
-        )
+        print_description("Degradation severity", severities)
 
     # ==============================================================
     # 5. Representative RGB samples
@@ -774,32 +530,17 @@ def evaluate_dataset():
             image_mean_luminances,
             image_median_luminances,
             dark_pixel_fractions,
-            good_pixel_fractions
+            good_pixel_fractions,
         )
     )
 
-    ranked.sort(
-        key=lambda item: item[1]
-    )
+    ranked.sort(key=lambda item: item[1])
 
-    number_to_show = min(
-        15,
-        len(ranked)
-    )
+    number_to_show = min(15, len(ranked))
 
-    representative_indices = (
-        np.linspace(
-            0,
-            len(ranked) - 1,
-            number_to_show,
-            dtype=int
-        )
-    )
+    representative_indices = np.linspace(0, len(ranked) - 1, number_to_show, dtype=int)
 
-    print(
-        "\nSamples spanning the RGB "
-        "quality distribution:\n"
-    )
+    print("\nSamples spanning the RGB " "quality distribution:\n")
 
     print(
         f"{'pair':<10}"
@@ -810,15 +551,11 @@ def evaluate_dataset():
         f"{'good %':>10}"
     )
 
-    print(
-        "-" * 64
-    )
+    print("-" * 64)
 
     representative_ids = []
 
-    for representative_index in (
-        representative_indices
-    ):
+    for representative_index in representative_indices:
 
         (
             pair_id,
@@ -826,14 +563,10 @@ def evaluate_dataset():
             mean_luminance,
             median_luminance,
             dark_fraction,
-            good_fraction
-        ) = ranked[
-            representative_index
-        ]
+            good_fraction,
+        ) = ranked[representative_index]
 
-        representative_ids.append(
-            pair_id
-        )
+        representative_ids.append(pair_id)
 
         print(
             f"{pair_id:<10}"
@@ -863,21 +596,13 @@ def evaluate_dataset():
             good_pixel_fractions,
             dark_pixel_fractions,
             image_mean_luminances,
-            rgb_image_mean_quality
+            rgb_image_mean_quality,
         )
     )
 
-    borderline_good.sort(
-        key=lambda item:
-        abs(
-            item[1] - 0.50
-        )
-    )
+    borderline_good.sort(key=lambda item: abs(item[1] - 0.50))
 
-    print(
-        "\nImages closest to 50% "
-        "sufficiently-lit pixels:\n"
-    )
+    print("\nImages closest to 50% " "sufficiently-lit pixels:\n")
 
     print(
         f"{'pair':<10}"
@@ -887,25 +612,15 @@ def evaluate_dataset():
         f"{'mean Q':>10}"
     )
 
-    print(
-        "-" * 52
-    )
+    print("-" * 52)
 
     borderline_ids = []
 
     for item in borderline_good[:10]:
 
-        (
-            pair_id,
-            good_fraction,
-            dark_fraction,
-            mean_luminance,
-            mean_quality
-        ) = item
+        pair_id, good_fraction, dark_fraction, mean_luminance, mean_quality = item
 
-        borderline_ids.append(
-            pair_id
-        )
+        borderline_ids.append(pair_id)
 
         print(
             f"{pair_id:<10}"
@@ -924,40 +639,24 @@ def evaluate_dataset():
             valid_pair_ids,
             image_mean_luminances,
             rgb_image_mean_quality,
-            dark_pixel_fractions
+            dark_pixel_fractions,
         ),
-        key=lambda item: item[1]
+        key=lambda item: item[1],
     )
 
-    print(
-        "\nDarkest RGB images:\n"
-    )
+    print("\nDarkest RGB images:\n")
 
-    print(
-        f"{'pair':<10}"
-        f"{'mean lum':>12}"
-        f"{'mean Q':>10}"
-        f"{'dark %':>10}"
-    )
+    print(f"{'pair':<10}" f"{'mean lum':>12}" f"{'mean Q':>10}" f"{'dark %':>10}")
 
-    print(
-        "-" * 42
-    )
+    print("-" * 42)
 
     darkest_ids = []
 
     for item in darkest[:10]:
 
-        (
-            pair_id,
-            mean_luminance,
-            mean_quality,
-            dark_fraction
-        ) = item
+        pair_id, mean_luminance, mean_quality, dark_fraction = item
 
-        darkest_ids.append(
-            pair_id
-        )
+        darkest_ids.append(pair_id)
 
         print(
             f"{pair_id:<10}"
@@ -975,41 +674,25 @@ def evaluate_dataset():
             valid_pair_ids,
             image_mean_luminances,
             rgb_image_mean_quality,
-            good_pixel_fractions
+            good_pixel_fractions,
         ),
         key=lambda item: item[1],
-        reverse=True
+        reverse=True,
     )
 
-    print(
-        "\nBrightest RGB images:\n"
-    )
+    print("\nBrightest RGB images:\n")
 
-    print(
-        f"{'pair':<10}"
-        f"{'mean lum':>12}"
-        f"{'mean Q':>10}"
-        f"{'good %':>10}"
-    )
+    print(f"{'pair':<10}" f"{'mean lum':>12}" f"{'mean Q':>10}" f"{'good %':>10}")
 
-    print(
-        "-" * 42
-    )
+    print("-" * 42)
 
     brightest_ids = []
 
     for item in brightest[:10]:
 
-        (
-            pair_id,
-            mean_luminance,
-            mean_quality,
-            good_fraction
-        ) = item
+        pair_id, mean_luminance, mean_quality, good_fraction = item
 
-        brightest_ids.append(
-            pair_id
-        )
+        brightest_ids.append(pair_id)
 
         print(
             f"{pair_id:<10}"
@@ -1027,53 +710,21 @@ def evaluate_dataset():
     print("7. BASIC LABEL INTEGRITY")
     print("=" * 70)
 
-    rgb_out_of_range = int(
-        np.sum(
-            (rgb_values < 0.0)
-            |
-            (rgb_values > 1.0)
-        )
-    )
+    rgb_out_of_range = int(np.sum((rgb_values < 0.0) | (rgb_values > 1.0)))
 
-    ir_out_of_range = int(
-        np.sum(
-            (ir_values < 0.0)
-            |
-            (ir_values > 1.0)
-        )
-    )
+    ir_out_of_range = int(np.sum((ir_values < 0.0) | (ir_values > 1.0)))
 
-    rgb_nan = int(
-        np.sum(
-            np.isnan(rgb_values)
-        )
-    )
+    rgb_nan = int(np.sum(np.isnan(rgb_values)))
 
-    ir_nan = int(
-        np.sum(
-            np.isnan(ir_values)
-        )
-    )
+    ir_nan = int(np.sum(np.isnan(ir_values)))
 
-    print(
-        f"\nRGB values outside [0,1]: "
-        f"{rgb_out_of_range}"
-    )
+    print(f"\nRGB values outside [0,1]: " f"{rgb_out_of_range}")
 
-    print(
-        f"IR values outside [0,1]:  "
-        f"{ir_out_of_range}"
-    )
+    print(f"IR values outside [0,1]:  " f"{ir_out_of_range}")
 
-    print(
-        f"RGB NaN values: "
-        f"{rgb_nan}"
-    )
+    print(f"RGB NaN values: " f"{rgb_nan}")
 
-    print(
-        f"IR NaN values:  "
-        f"{ir_nan}"
-    )
+    print(f"IR NaN values:  " f"{ir_nan}")
 
     # ==============================================================
     # 8. Manual inspection commands
@@ -1103,21 +754,13 @@ def evaluate_dataset():
     for pair_id in candidate_ids:
 
         if pair_id not in inspection_ids:
-            inspection_ids.append(
-                pair_id
-            )
+            inspection_ids.append(pair_id)
 
-    print(
-        "\nInspect these RGB examples before "
-        "changing lighting thresholds:\n"
-    )
+    print("\nInspect these RGB examples before " "changing lighting thresholds:\n")
 
     for pair_id in inspection_ids:
 
-        print(
-            f"python {script_path} "
-            f"{pair_id} rgb"
-        )
+        print(f"python {script_path} " f"{pair_id} rgb")
 
     # ==============================================================
     # 9. Interpretation reminders
@@ -1128,8 +771,7 @@ def evaluate_dataset():
     print("9. WHAT TO LOOK FOR")
     print("=" * 70)
 
-    print(
-        """
+    print("""
 Use these statistics together with the visualizations.
 
 For DARK_THRESHOLD:
@@ -1161,8 +803,7 @@ For degradation balance:
 Do not choose new thresholds from numerical percentiles alone.
 The final decision should combine these statistics with visual
 inspection of representative images.
-"""
-    )
+""")
 
 
 # ------------------------------------------------------------------

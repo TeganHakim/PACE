@@ -405,23 +405,23 @@ The RGB image, IR image, XML annotations, and quality maps all describe the same
 
 Each row represents one complete synchronized RGB/IR example.
 
-| Field | Purpose |
-|---|---|
-| `pair_id` | Unique identifier shared by all files in the pair |
-| `split` | Original train/validation/test split |
-| `rgb_path` | Path to processed/cropped RGB image |
-| `ir_path` | Path to processed/cropped IR image |
-| `rgb_xml` | Path to adjusted RGB ground-truth XML |
-| `ir_xml` | Path to adjusted IR ground-truth XML |
-| `rgb_quality` | Path to RGB 8×8 quality map |
-| `ir_quality` | Path to IR 8×8 quality map |
-| `degraded` | Whether synthetic degradation was applied |
-| `modality` | Modality receiving degradation (`rgb`, `ir`, or `none`) |
-| `degradation_type` | Synthetic degradation type |
-| `severity` | Sampled degradation severity |
-| `source_rgb` | Path to original RGB image |
-| `source_ir` | Path to original IR image |
-| `seed` | Random seed used during generation |
+| Field              | Purpose                                                 |
+| ------------------ | ------------------------------------------------------- |
+| `pair_id`          | Unique identifier shared by all files in the pair       |
+| `split`            | Original train/validation/test split                    |
+| `rgb_path`         | Path to processed/cropped RGB image                     |
+| `ir_path`          | Path to processed/cropped IR image                      |
+| `rgb_xml`          | Path to adjusted RGB ground-truth XML                   |
+| `ir_xml`           | Path to adjusted IR ground-truth XML                    |
+| `rgb_quality`      | Path to RGB 8×8 quality map                             |
+| `ir_quality`       | Path to IR 8×8 quality map                              |
+| `degraded`         | Whether synthetic degradation was applied               |
+| `modality`         | Modality receiving degradation (`rgb`, `ir`, or `none`) |
+| `degradation_type` | Synthetic degradation type                              |
+| `severity`         | Sampled degradation severity                            |
+| `source_rgb`       | Path to original RGB image                              |
+| `source_ir`        | Path to original IR image                               |
+| `seed`             | Random seed used during generation                      |
 
 The actual 8×8 quality maps are stored as `.npy` files rather than embedded directly into the CSV.
 
