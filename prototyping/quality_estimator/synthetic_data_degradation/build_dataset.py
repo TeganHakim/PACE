@@ -177,7 +177,7 @@ SPLIT_CONFIGS = {
 #     2 test
 #
 # Use None for the complete dataset.
-MAX_SAMPLES = 200
+MAX_SAMPLES = None
 
 
 # ------------------------------------------------------------------
