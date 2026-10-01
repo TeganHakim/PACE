@@ -10,7 +10,7 @@
 
 class Args():
 	# For training
-	path = "../../VisDrone-DroneVehicle" 
+	path = "../../processed_dataset" 
 	type_flag = 'rgb' # 'ir' or 'rgb'
 	cuda = True
 	lr = 0.0001

@@ -24,8 +24,6 @@ from network.net_autoencoder import Auto_Encoder_single
 
 from args_auto import Args as args
 
-BORDER_PIXELS = 100
-
 # -------------------------------------------------------
 # Auto-Encoder
 custom_config_auto = {
@@ -101,8 +99,7 @@ def train(data, img_flag):
 		for idx in range(batch_num):
 			
 			image_paths = img_paths[idx * batch_size:(idx * batch_size + batch_size)]
-			img = utils.get_train_images(image_paths, height=args.Height, width=args.Width,
-                             			flag=img_flag, border=BORDER_PIXELS)
+			img = utils.get_train_images(image_paths, height=args.Height, width=args.Width, flag=img_flag)
 			
 			count += 1
 			optimizer.zero_grad()
@@ -212,8 +209,6 @@ Outputs, written under args.save_auto_model:
 
 Notes:
     - Set resume_model_auto to a checkpoint path to continue training.
-    - If you train on cropped images (BORDER_PIXELS > 0), use the same
-      crop at inference.
 """
 if __name__ == "__main__":
 	# True - RGB, False - gray

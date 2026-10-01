@@ -23,25 +23,39 @@ EPSILON = 1e-6
 
 from os.path import join, isdir   # add isdir to your existing import
 
-IMG_EXTS = ('.png', '.jpg', '.jpeg', '.bmp', '.tif')
-
+IMG_EXTS = ('.jpg', '.jpeg')
 
 def list_dronevehicle_images(root, modality, splits=("train",), num=None):
     """
-    List image paths from VisDrone-DroneVehicle.
+    List image paths from the processed VisDrone-DroneVehicle dataset.
 
     Layout:
-        root/{split}/{split}img/    rgb (modality="rgb")
-        root/{split}/{split}imgr/   infrared (modality="ir")
+        root/{split}/
+            ir/              infrared images
+            ir_annotations/  infrared annotations
+            rgb/             RGB images
+            rgb_annotations/ RGB annotations
+            quality_maps/    quality maps
+
+    Args:
+        root: Dataset root directory.
+        modality: "rgb" or "ir".
+        splits: Dataset splits to include, e.g. ("train", "val").
+        num: Maximum number of images to return.
+
+    Returns:
+        List of image paths.
     """
     if modality not in ("rgb", "ir"):
-        raise ValueError(f"modality must be 'rgb' or 'ir', got {modality!r}")
+        raise ValueError(
+            f"modality must be 'rgb' or 'ir', got {modality!r}"
+        )
 
-    suffix = "r" if modality == "ir" else ""
     images = []
 
     for split in splits:
-        folder = join(root, split, split + "img" + suffix)
+        folder = join(root, split, modality)
+
         if not isdir(folder):
             raise FileNotFoundError(f"Missing folder: {folder}")
 
@@ -303,7 +317,7 @@ def crop_op(img, c_h, c_w):
 
 
 # load images
-def get_image(path, height=256, width=256, flag=False, border=0):
+def get_image(path, height=256, width=256, flag=False):
     if flag is True:
         mode = cv2.IMREAD_COLOR
     else:
@@ -312,8 +326,6 @@ def get_image(path, height=256, width=256, flag=False, border=0):
     # -----------------------------------------------------
     assert image is not None, \
         f"The type of image ({path}) is None."
-    if border > 0:
-        image = image[border:-border, border:-border]
     # -----------------------------------------------------
     if height is not None and width is not None:
         image = cv2.resize(image, (height, width))
@@ -321,12 +333,12 @@ def get_image(path, height=256, width=256, flag=False, border=0):
 
 
 # get training images
-def get_train_images(paths, height=256, width=256, flag=False, border=0):
+def get_train_images(paths, height=256, width=256, flag=False):
     if isinstance(paths, str):
         paths = [paths]
     images = []
     for path in paths:
-        image = get_image(path, height, width, flag, border)
+        image = get_image(path, height, width, flag)
         if flag is True:
             image = np.transpose(image, (2, 0, 1))
         else:
