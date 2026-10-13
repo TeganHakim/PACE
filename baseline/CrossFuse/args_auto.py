@@ -11,7 +11,7 @@
 class Args():
 	# For training
 	path = "../../processed_dataset" 
-	type_flag = 'rgb' # 'ir' or 'rgb'
+	type_flag = 'ir' # 'ir' or 'rgb'
 	cuda = True
 	lr = 0.0001
 	epochs = 4

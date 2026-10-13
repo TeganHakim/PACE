@@ -17,6 +17,7 @@ import time
 # from visdom import Visdom
 
 from tools import utils
+from tqdm import tqdm
 import random
 from torch.optim import Adam
 from torch.autograd import Variable
@@ -67,7 +68,7 @@ def train(data, img_flag):
 	
 	# ------------------------------------------------------
 	trainable_params = [{'params': filter(lambda x: x.requires_grad, model.parameters()), 'lr': args.lr}]
-	optimizer = Adam(trainable_params, args.lr, weight_decay=0.9)
+	optimizer = Adam(trainable_params, args.lr, weight_decay=0.1)
 
 	# visdom
 	# viz = Visdom()
@@ -95,8 +96,12 @@ def train(data, img_flag):
 	for e in range(args.epochs):
 		lr_cur = utils.adjust_learning_rate(optimizer, e, args.lr)
 		img_paths, batch_num = utils.load_dataset(data, batch_size)
+		progress = tqdm(
+			range(batch_num),
+			desc=f"Epoch {e + 1}/{args.epochs}"
+		)
 		
-		for idx in range(batch_num):
+		for idx in progress:
 			
 			image_paths = img_paths[idx * batch_size:(idx * batch_size + batch_size)]
 			img = utils.get_train_images(image_paths, height=args.Height, width=args.Width, flag=img_flag)
@@ -153,10 +158,11 @@ def train(data, img_flag):
 				# viz.images(weight_fuse.view(-1, 1, args.Height, args.Width), win='z')
 				# viz.images(weights[3][0, :, :, :].view(-1, 1, args.Height, args.Width), win='z1')
 				
-				print(mesg)
+				tqdm.write(mesg)
 				loss_p4 = 0.
 				loss_p5 = 0.
 				loss_all = 0.
+			progress.set_postfix(loss=f"{total_loss.item():.4f}")
 		
 		# with torch.no_grad():
 		# 	print('Start. Testing image data on epoch {}'.format(e + 1))
