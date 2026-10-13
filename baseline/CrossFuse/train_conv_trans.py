@@ -24,7 +24,7 @@ from network.loss import Gradient_loss, Order_loss, Patch_loss
 
 from args_trans import Args as args
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 # -------------------------------------------------------
 # Auto-Encoder
 custom_config_auto = {
@@ -57,55 +57,61 @@ custom_config = {
 
 
 # -------------------------------------------------------
-def load_data(path, train_num):
+def load_data(root, modality, splits, train_num):
 	# train_num for KAIST
-	imgs_path, _ = utils.list_images_datasets(path, train_num)
-	# imgs_path = imgs_path[:train_num]
+	imgs_path = utils.list_dronevehicle_images(root, modality, splits, train_num)
 	random.shuffle(imgs_path)
 	return imgs_path
 
 
 # -------------------------------------------------------
-def test(model_auto_ir, model_auto_vi, model, shift_flag, e):
-	img_flag = False
-	test_path_ir = './images/21_pairs_tno/ir'
-	test_path_vi = './images/21_pairs_tno/vis'
-	ir_pathes, ir_names = utils.list_images_test(test_path_ir)
-	# ---------------------------------------------------
-	output_path1 = './output/transfuse'
-	if os.path.exists(output_path1) is False:
-		os.mkdir(output_path1)
-	output_path = output_path1 + '/training_21_tno_epoch_' + str(e)
-	if os.path.exists(output_path) is False:
-		os.mkdir(output_path)
+# def test(model_auto_ir, model_auto_vi, model, shift_flag, e):
+# 	img_flag = False
+# 	test_path_ir = './images/21_pairs_tno/ir'
+# 	test_path_vi = './images/21_pairs_tno/vis'
+# 	ir_pathes, ir_names = utils.list_images_test(test_path_ir)
+# 	# ---------------------------------------------------
+# 	output_path1 = './output/transfuse'
+# 	if os.path.exists(output_path1) is False:
+# 		os.mkdir(output_path1)
+# 	output_path = output_path1 + '/training_21_tno_epoch_' + str(e)
+# 	if os.path.exists(output_path) is False:
+# 		os.mkdir(output_path)
 	
-	for ir_name in ir_names:
-		vi_name = ir_name.replace('IR', 'VIS')
-		ir_path = os.path.join(test_path_ir, ir_name)
-		vi_path = os.path.join(test_path_vi, vi_name)
-		# for training phase
-		ir_img = utils.get_train_images(ir_path, height=args.Height, width=args.Width, flag=img_flag)
-		vi_img = utils.get_train_images(vi_path, height=args.Height, width=args.Width, flag=img_flag)
-		ir_img = Variable(ir_img, requires_grad=False)
-		vi_img = Variable(vi_img, requires_grad=False)
-		if args.cuda:
-			ir_img = ir_img.cuda()
-			vi_img = vi_img.cuda()
+# 	for ir_name in ir_names:
+# 		vi_name = ir_name.replace('IR', 'VIS')
+# 		ir_path = os.path.join(test_path_ir, ir_name)
+# 		vi_path = os.path.join(test_path_vi, vi_name)
+# 		# for training phase
+# 		ir_img = utils.get_train_images(ir_path, height=args.Height, width=args.Width, flag=img_flag)
+# 		vi_img = utils.get_train_images(vi_path, height=args.Height, width=args.Width, flag=img_flag)
+# 		ir_img = Variable(ir_img, requires_grad=False)
+# 		vi_img = Variable(vi_img, requires_grad=False)
+# 		if args.cuda:
+# 			ir_img = ir_img.cuda()
+# 			vi_img = vi_img.cuda()
 		
-		# ---------------------------------------------
-		ir_sh, ir_de = model_auto_ir(ir_img)
-		vi_sh, vi_de = model_auto_vi(vi_img)
-		outputs = model(ir_de, ir_sh, vi_de, vi_sh, shift_flag)
-		out = outputs['out']
-		# ---------------------------------------------
-		path_out_ir = output_path + '/results_transfuse_' + ir_name
-		utils.save_image(out, path_out_ir)
+# 		# ---------------------------------------------
+# 		ir_sh, ir_de = model_auto_ir(ir_img)
+# 		vi_sh, vi_de = model_auto_vi(vi_img)
+# 		outputs = model(ir_de, ir_sh, vi_de, vi_sh, shift_flag)
+# 		out = outputs['out']
+# 		# ---------------------------------------------
+# 		path_out_ir = output_path + '/results_transfuse_' + ir_name
+# 		utils.save_image(out, path_out_ir)
 
 
 # -------------------------------------------------------
 def train(data, img_flag):
 	batch_size = args.batch
 	step = args.step
+
+	# fall back to CPU if CUDA is off or unavailable
+	use_cuda = args.cuda and torch.cuda.is_available()
+	if args.cuda and not use_cuda:
+		print('args.cuda is True but CUDA is not available, using CPU.')
+	device = torch.device('cuda' if use_cuda else 'cpu')
+	print('Training on {}'.format(device))
 	
 	model = Trans_FuseNet(**custom_config)
 	# model = torch.nn.DataParallel(model_or, list(range(torch.cuda.device_count()))).cuda()
@@ -134,12 +140,11 @@ def train(data, img_flag):
 	# visdom
 	# viz = Visdom()
 	
-	if args.cuda:
-		model_auto_ir.cuda()
-		model_auto_vi.cuda()
-		model.cuda()
-		gra_loss.cuda()
-		order_loss.cuda()
+	model_auto_ir.to(device)
+	model_auto_vi.to(device)
+	model.to(device)
+	gra_loss.to(device)
+	order_loss.to(device)
 	
 	model_auto_ir.eval()
 	model_auto_vi.eval()
@@ -186,9 +191,8 @@ def train(data, img_flag):
 			batch_ir = Variable(img_ir, requires_grad=False)
 			batch_vi = Variable(img_vi, requires_grad=False)
 			
-			if args.cuda:
-				batch_ir = batch_ir.cuda()
-				batch_vi = batch_vi.cuda()
+			batch_ir = batch_ir.to(device)
+			batch_vi = batch_vi.to(device)
 			
 			with torch.no_grad():
 				ir_sh, ir_de = model_auto_ir(batch_ir)
@@ -285,7 +289,7 @@ def train(data, img_flag):
 		torch.save(model.state_dict(), save_model_path)
 		##############
 		model.train()
-		model.cuda()
+		model.to(device)
 		print("\nCheckpoint, trained model saved at: " + save_model_path)
 	
 	print("\nDone, TransFuse training phase.")
@@ -298,8 +302,8 @@ if __name__ == "__main__":
 	else:
 		img_flag = True
 	
-	path = args.path_ir
+	path = args.path
 	train_num = args.train_num
-	data = load_data(path, train_num)
+	data = load_data(args.path, args.type_flag, ("train",), args.train_num)
 	
 	train(data, img_flag)

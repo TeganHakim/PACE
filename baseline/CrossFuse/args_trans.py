@@ -7,7 +7,7 @@
 
 class Args():
 	# For training
-	path_ir = ['G:/datasets/Image-fusion/KAIST/lwir/']
+	path = "../../processed_dataset"
 	# path_ir = ['/data/Disk_B/KAIST-RGBIR/lwir/']
 	cuda = True
 	lr = 0.001
