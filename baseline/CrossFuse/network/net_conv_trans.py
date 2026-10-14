@@ -11,6 +11,7 @@ import numpy as np
 
 from network.transformer_cam import cross_encoder, PatchEmbed_tensor, Recons_tensor
 from network.loss import mse_loss, ssim_loss, feature_loss
+from ultralytics.nn.tasks import DetectionModel
 from tools import utils
 # from fuse_network.net_autoencoder import Encoder
 
@@ -147,27 +148,27 @@ Simple detection head for predicting objectness, bounding boxes, and class score
 Contains two, 3x3 convolutional layers with ReLU activation, followed by a final 1x1 convolutional 
 layer that outputs the predictions.
 """
-class DetectionHead(nn.Module):
-    def __init__(self, in_channels, num_classes):
-        super(DetectionHead, self).__init__()
+# class DetectionHead(nn.Module):
+#     def __init__(self, in_channels, num_classes):
+#         super(DetectionHead, self).__init__()
 
-        self.features = nn.Sequential(
-            nn.Conv2d(in_channels, 256, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(256, 128, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True)
-        )
+#         self.features = nn.Sequential(
+#             nn.Conv2d(in_channels, 256, kernel_size=3, padding=1),
+#             nn.ReLU(inplace=True),
+#             nn.Conv2d(256, 128, kernel_size=3, padding=1),
+#             nn.ReLU(inplace=True)
+#         )
 
-        # objectness + x + y + width + height + class scores
-        self.prediction = nn.Conv2d(128, 5 + num_classes, kernel_size=1)
+#         # objectness + x + y + width + height + class scores
+#         self.prediction = nn.Conv2d(128, 5 + num_classes, kernel_size=1)
 
-    def forward(self, x):
-        x = self.features(x)
-        return self.prediction(x)
+#     def forward(self, x):
+#         x = self.features(x)
+#         return self.prediction(x)
 
 class Trans_FuseNet(nn.Module):
     def __init__(self, img_size, patch_size, en_out_channels1, out_channels, part_out, train_flag, 
-                 depth_self, depth_cross, n_heads, mlp_ratio, qkv_bias, p, attn_p):
+                 depth_self, depth_cross, n_heads, mlp_ratio, qkv_bias, p, attn_p, num_classes=5):
         super().__init__()
         self.img_size = img_size  # 32*32
         self.patch_size = patch_size  # 2*2
@@ -187,7 +188,13 @@ class Trans_FuseNet(nn.Module):
         self.conv_gra.weight.data = weight.repeat(en_out_channels1, en_out_channels1, 1, 1).float()
 
         self.decoder_fusion = Decoder_fusion(part_out, out_channels, train_flag)
-        self.detection_head = DetectionHead(part_out, num_classes=5)
+        # self.detection_head = DetectionHead(part_out, num_classes=num_classes)
+        self.detector = DetectionModel(
+                            "yolo11n.yaml",
+                            ch=1,
+                            nc=5,
+                            verbose=False,
+                        )
 
     def forward(self, ir_de, ir_sh, vi_de, vi_sh, shift_flag):
         # based on 32*32, for arbitrary image size
@@ -233,12 +240,15 @@ class Trans_FuseNet(nn.Module):
         # -----------------------------------
         in_put = c_f
         # -----------------------------------
-        # Detections
-        detections = self.detection_head(in_put)
-        # -----------------------------------
         out = self.decoder_fusion(ir_sh, vi_sh, ir_de, vi_de, in_put)
         out = utils.normalize_tensor(out)
         out = out * 255
+        # -----------------------------------
+        # Detections
+        # detections = self.detection_head(in_put)
+        # After generating the fused image `out`:
+        detector_input = out / 255.0 # Needs to be [0, 1]
+        detections = self.detector(detector_input)
         # -----------------------------------
         outputs = {
             'out': out,
@@ -253,6 +263,7 @@ class Trans_FuseNet(nn.Module):
         # cross attention module
         c_f, ir_self, vi_self, ir_roll, vi_roll, vi_cross, ir_cross = self.cross_atten_block(ir_de, vi_de, shift_flag)
         in_put = c_f
+       
         # -----------------------------------
         # visiualize the middle features
         ir_s = utils.recons_midle_feature(ir_self)

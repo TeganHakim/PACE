@@ -13,6 +13,7 @@ import numpy as np
 from torch.autograd import Variable
 from network.net_autoencoder import Auto_Encoder_single
 from network.net_conv_trans import Trans_FuseNet
+from ultralytics.utils.nms import non_max_suppression
 from tools import utils
 from args_trans import Args as args
 
@@ -26,7 +27,7 @@ CLASS_NAMES = [
     "freight_car"
 ]
 
-DEVICE =torch.device("cpu" if not torch.cuda.is_available() else "cuda")
+DEVICE = torch.device("cpu" if not torch.cuda.is_available() else "cuda")
 # imagenet_labels = dict(enumerate(open("classes.txt")))
 
 
@@ -42,7 +43,7 @@ def load_model(custom_config_auto, custom_config_trans, model_path_auto_ir, mode
     model_auto_vi.eval()
     # ---------------------------------------------------------
     model_trans = Trans_FuseNet(**custom_config_trans)
-    model_trans.load_state_dict(torch.load(model_path_trans), strict=False) # Take out strict=False after testing!!
+    model_trans.load_state_dict(torch.load(model_path_trans))
     model_trans.to(DEVICE)
     model_trans.eval()
     return model_auto_ir, model_auto_vi, model_trans
@@ -50,48 +51,42 @@ def load_model(custom_config_auto, custom_config_trans, model_path_auto_ir, mode
 """
 Function to decode the detections from the model output into bounding boxes and class labels
 """
-def decode_detections(detections, image_width, image_height, threshold=0.5):
-    detections = detections[0]
-    objectness = torch.sigmoid(detections[0])
-    x = torch.sigmoid(detections[1])
-    y = torch.sigmoid(detections[2])
-    w = torch.sigmoid(detections[3])
-    h = torch.sigmoid(detections[4])
 
-    # Class predictions
-    class_scores = torch.softmax(detections[5:10], dim=0)
-    feature_height = detections.shape[1]
-    feature_width = detections.shape[2]
+def decode_detections(detections, image_width, image_height,
+                      threshold=0.25, iou_threshold=0.45):
+    # TransFuse returns (prediction_tensor, auxiliary_dict).
+    if isinstance(detections, (tuple, list)):
+        detections = detections[0]
+
+    # Expected shape: [batch, 4 + num_classes, num_predictions].
+    if detections.ndim != 3:
+        raise ValueError(
+            f"Expected [B, C, N] predictions, got {detections.shape}"
+        )
+
+    # Ultralytics NMS expects this raw prediction format and performs
+    # xywh-to-xyxy conversion, confidence filtering, and NMS.
+    results = non_max_suppression(
+        detections,
+        conf_thres=threshold,
+        iou_thres=iou_threshold,
+        nc=len(CLASS_NAMES),
+    )
 
     boxes = []
-    for row in range(feature_height):
-        for col in range(feature_width):
-            confidence = objectness[row, col].item()
-            if confidence < threshold:
+    for det in results:
+        for x1, y1, x2, y2, confidence, class_id in det.tolist():
+            class_id = int(class_id)
+
+            # Scale boxes if the detector's input size differs from
+            # the image on which the boxes will be drawn.
+            x1 = max(0, min(int(x1), image_width - 1))
+            y1 = max(0, min(int(y1), image_height - 1))
+            x2 = max(0, min(int(x2), image_width - 1))
+            y2 = max(0, min(int(y2), image_height - 1))
+
+            if class_id < 0 or class_id >= len(CLASS_NAMES):
                 continue
-            # Find most likely class
-            class_score, class_id = torch.max(class_scores[:, row, col], dim=0)
-            class_score = class_score.item()
-            class_id = class_id.item()
-
-            # Combine objectness and class confidence
-            confidence = confidence * class_score
-            if confidence < threshold:
-                continue
-
-            center_x = x[row, col].item() * image_width
-            center_y = y[row, col].item() * image_height
-            box_width = w[row, col].item() * image_width
-            box_height = h[row, col].item() * image_height
-
-            x1 = int(center_x - box_width / 2)
-            y1 = int(center_y - box_height / 2)
-            x2 = int(center_x + box_width / 2)
-            y2 = int(center_y + box_height / 2)
-            x1 = max(0, min(x1, image_width - 1))
-            y1 = max(0, min(y1, image_height - 1))
-            x2 = max(0, min(x2, image_width - 1))
-            y2 = max(0, min(y2, image_height - 1))
 
             boxes.append({
                 "x1": x1,
@@ -100,8 +95,9 @@ def decode_detections(detections, image_width, image_height, threshold=0.5):
                 "y2": y2,
                 "confidence": confidence,
                 "class_id": class_id,
-                "class_name": CLASS_NAMES[class_id]
+                "class_name": CLASS_NAMES[class_id],
             })
+
     return boxes
 
 def test(model_auto_ir, model_auto_vi, model_trans, shift_flag, ir_path, vi_path, ir_name, output_path,
@@ -121,12 +117,29 @@ def test(model_auto_ir, model_auto_vi, model_trans, shift_flag, ir_path, vi_path
     vi_sh, vi_de = model_auto_vi(vi_img)
     outputs = model_trans(ir_de, ir_sh, vi_de, vi_sh, shift_flag)
 
-    print("Fused feature shape:", outputs['fused_features'].shape)
-    print("Detection output:", outputs['detections'].shape)
+    print("Fused feature shape:", outputs["fused_features"].shape)
+    detections = outputs["detections"]
+    print("Detection output type:", type(detections))
+    if isinstance(detections, (tuple, list)):
+        for i, item in enumerate(detections):
+            if torch.is_tensor(item):
+                print(f"Detection output [{i}]: shape={item.shape}")
+            else:
+                print(f"Detection output [{i}]: type={type(item)}")
+    elif torch.is_tensor(detections):
+        print("Detection output shape:", detections.shape)
     
     # Decode and display bounding boxes on the original visible image
-    vi_original = cv2.imread(vi_path)
-    image_height, image_width = vi_original.shape[:2]
+    fused = outputs["out"].detach().float().cpu()[0, 0]
+
+    # Already in the 0–255 range.
+    img_out = fused.clamp(0, 255).numpy().astype(np.uint8)
+
+    # Convert grayscale to 3-channel BGR for drawing boxes.
+    img_out = cv2.cvtColor(img_out, cv2.COLOR_GRAY2BGR)
+
+    image_height, image_width = img_out.shape[:2]
+
     boxes = decode_detections(
         outputs['detections'],
         image_width,
@@ -143,7 +156,7 @@ def test(model_auto_ir, model_auto_vi, model_trans, shift_flag, ir_path, vi_path
         class_name = box["class_name"]
 
         cv2.rectangle(
-            vi_original,
+            img_out,
             (x1, y1),
             (x2, y2),
             (0, 255, 0),
@@ -151,7 +164,7 @@ def test(model_auto_ir, model_auto_vi, model_trans, shift_flag, ir_path, vi_path
         )
         label = "{} {:.2f}".format(class_name, confidence)
         cv2.putText(
-            vi_original,
+            img_out,
             label,
             (x1, max(y1 - 5, 15)),
             cv2.FONT_HERSHEY_SIMPLEX,
@@ -159,8 +172,7 @@ def test(model_auto_ir, model_auto_vi, model_trans, shift_flag, ir_path, vi_path
             (0, 255, 0),
             1
         )
-    cv2.imwrite(os.path.join(output_path, "det_" + ir_name), vi_original)
-    # img_out = outputs['out']
+    cv2.imwrite(os.path.join(output_path, "det_" + ir_name), img_out)
     # ir_self = outputs['ir_self']
     # vi_self = outputs['vi_self']
     # fuse_cross = outputs['fuse_cross']
@@ -208,28 +220,20 @@ if __name__ == "__main__":
     }
     
     resume_model_auto_ir = "./models/autoencoder/auto_encoder_epoch_4_ir.model"
-    resume_model_auto_vi = "./models/autoencoder/auto_encoder_epoch_4_vi.model"
+    resume_model_auto_vi = "./models/autoencoder/auto_encoder_epoch_4_rgb.model"
     
     # model_path_auto = "./models/autoencoder/auto_encoder_epoch_3.model"
-    model_path_trans = "./models/transfuse/fusetrans_epoch_32_bs_8_num_20k_lr_0.1_s1_c1.model"
-    # model_path_trans = "./models/transfuse/fusetrans_epoch_8_nosh.model"
+    # model_path_trans = "./models/transfuse/fusetrans_epoch_32_bs_8_num_20k_lr_0.1_s1_c1.model"
+    model_path_trans = "./models/transfuse/fusetrans_epoch_10.model"
     # ----------------------------------------------------
     img_flag = True
 
-    test_path_ir = './images/M3FD_Fusion/ir'
-    test_path_vi = './images/M3FD_Fusion/vis'
-    data_type = '/M3FD_Fusion_nosh'
- 
-    # test_path_ir = './images/vot/ir'
-    # test_path_vi = './images/vot/vis'
-    # data_type = '/vot_transfuse'
+    test_path_ir = '../../processed_dataset/test/ir'
+    test_path_vi = '../../processed_dataset/test/rgb'
     
     ir_pathes, ir_names = utils.list_images_test(test_path_ir)
     # ---------------------------------------------------
-    output_path1 = './output/crossfuse_test'
-    if os.path.exists(output_path1) is False:
-        os.mkdir(output_path1)
-    output_path = output_path1 + data_type
+    output_path = './output/crossfuse_test'
     if os.path.exists(output_path) is False:
         os.mkdir(output_path)
     output_path_fea = output_path + '/feature'

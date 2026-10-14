@@ -24,8 +24,8 @@ class Args():
 	crop_w = 256
 
 	vgg_model_dir = "./models/vgg"
-	resume_model_auto_ir = "./models/autoencoder/auto_encoder_epoch_5_ir.model"
-	resume_model_auto_vi = "./models/autoencoder/auto_encoder_epoch_5_vi.model"
+	resume_model_auto_ir = "./models/autoencoder/auto_encoder_epoch_4_ir.model"
+	resume_model_auto_vi = "./models/autoencoder/auto_encoder_epoch_4_rgb.model"
 	# resume_model_auto_ir = None
 	# resume_model_auto_vi = None
 
