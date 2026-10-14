@@ -62,7 +62,7 @@ def load_encoder(modality, device="cpu"):
             CROSSFUSE_ROOT
             / "models"
             / "autoencoder"
-            / f"auto_encoder_epoch_4_vi.model"
+            / f"auto_encoder_epoch_4_rgb.model"
         )
 
     if not weights_path.exists():
