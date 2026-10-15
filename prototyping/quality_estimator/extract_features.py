@@ -193,8 +193,7 @@ def main():
     parser.add_argument(
         "--max-samples",
         type=int,
-        default=10,
-        help="Maximum samples per split. Default: 10.",
+        default=None
     )
 
     args = parser.parse_args()

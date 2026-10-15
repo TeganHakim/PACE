@@ -226,3 +226,11 @@ processed_dataset/
 .complete/
 archive*.zip
 processed_dataset_full.zip
+
+# Quality estimator generated files
+prototyping/quality_estimator/features/
+prototyping/quality_estimator/checkpoints/
+prototyping/quality_estimator/features.zip
+
+# macOS metadata
+.DS_Store
