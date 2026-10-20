@@ -1,0 +1,34 @@
+=======================================================
+RGB GROUND-TRUTH QUALITY DISTRIBUTION
+=======================================================
+Split:             train
+Images:            17,962
+Total patches:     1,149,568
+
+SUMMARY STATISTICS
+-------------------------------------------------------
+Mean:              0.7144
+Median:            0.9878
+Standard deviation:0.3907
+Minimum:           0.0000
+Maximum:           1.0000
+
+PATCH QUALITY DISTRIBUTION
+-------------------------------------------------------
+[0.00, 0.20]: 237,519 patches (20.66%)
+[0.20, 0.40]: 61,381 patches (5.34%)
+[0.40, 0.60]: 53,611 patches (4.66%)
+[0.60, 0.80]: 63,728 patches (5.54%)
+[0.80, 0.95]: 87,251 patches (7.59%)
+[0.95, 1.00]: 646,078 patches (56.20%)
+
+KEY TAKEAWAYS
+-------------------------------------------------------
+Near-clean patches (>= 0.95): 56.20%
+Degraded patches   (< 0.80):  36.21%
+Severely degraded  (< 0.50):  28.33%
+
+INTERPRETATION
+-------------------------------------------------------
+Near-clean patches do not exceed 90% of the dataset.
+Check estimator predictions before attributing errors to imbalance.

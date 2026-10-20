@@ -7,8 +7,13 @@ training for each modality.
 """
 
 """
-Train RGB and IR spatial quality estimators using cached
-CrossFuse deep feature maps and ground-truth 8x8 quality maps.
+Train RGB and IR spatial quality estimators using cached CrossFuse
+deep feature maps and ground-truth 8x8 quality maps.
+
+Changes:
+    1. Weighted MSE emphasizes degraded patches.
+    2. WeightedRandomSampler favors images containing degraded patches.
+    3. Validation reports performance by patch-quality category.
 
 Run from the PACE repository root:
 
@@ -16,11 +21,11 @@ Run from the PACE repository root:
 """
 
 from pathlib import Path
+import random
 
 import numpy as np
 import torch
-import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 
 from model import SpatialQualityEstimator
 
@@ -42,6 +47,19 @@ EPOCHS = 20
 BATCH_SIZE = 4
 LEARNING_RATE = 1e-3
 RANDOM_SEED = 42
+
+# Weighted MSE:
+# quality=1.0 -> weight=1
+# quality=0.0 -> weight=5
+LOSS_WEIGHT_STRENGTH = 4.0
+
+# Image-level sampling:
+# Images with any patch below this threshold are considered degraded.
+DEGRADED_THRESHOLD = 0.8
+
+# Target fraction of degraded images drawn per training epoch.
+# This balances image categories, not individual patch categories.
+DEGRADED_SAMPLE_FRACTION = 0.5
 
 
 # ---------------------------------------------------------
@@ -85,7 +103,10 @@ class QualityFeatureDataset(Dataset):
                 f"No feature files found in {self.feature_dir}"
             )
 
-        # Validate feature/label pairing before training.
+        self.label_paths = []
+        self.is_degraded = []
+
+        # Validate pairing and cache image-level degradation flags.
         for feature_path in self.feature_paths:
             label_path = self.quality_dir / (
                 f"{feature_path.stem}_{modality}.npy"
@@ -96,18 +117,25 @@ class QualityFeatureDataset(Dataset):
                     f"Missing quality label: {label_path}"
                 )
 
+            quality = np.load(label_path)
+
+            if quality.shape != (8, 8):
+                raise ValueError(
+                    f"Unexpected quality shape: {label_path}"
+                )
+
+            self.label_paths.append(label_path)
+            self.is_degraded.append(
+                bool(np.any(quality < DEGRADED_THRESHOLD))
+            )
+
     def __len__(self):
         return len(self.feature_paths)
 
     def __getitem__(self, index):
         feature_path = self.feature_paths[index]
-        sample_id = feature_path.stem
+        label_path = self.label_paths[index]
 
-        label_path = self.quality_dir / (
-            f"{sample_id}_{self.modality}.npy"
-        )
-
-        # Saved as float16; train using float32.
         features = torch.load(
             feature_path,
             map_location="cpu",
@@ -116,12 +144,6 @@ class QualityFeatureDataset(Dataset):
 
         quality = np.load(label_path).astype(np.float32)
         quality = torch.from_numpy(quality).unsqueeze(0)
-
-        if quality.shape != (1, 8, 8):
-            raise ValueError(
-                f"Unexpected quality shape for {sample_id}: "
-                f"{quality.shape}"
-            )
 
         return features, quality
 
@@ -145,31 +167,108 @@ def get_device():
 # ---------------------------------------------------------
 
 def set_seed(seed):
-    torch.manual_seed(seed)
+    random.seed(seed)
     np.random.seed(seed)
+    torch.manual_seed(seed)
 
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
 
 # ---------------------------------------------------------
+# Weighted MSE
+# ---------------------------------------------------------
+
+def weighted_mse(predictions, targets):
+    """
+    Weight each patch according to its ground-truth quality.
+
+    weight = 1 + strength * (1 - quality)
+
+    Lower-quality patches contribute more to the loss.
+    """
+    weights = 1.0 + LOSS_WEIGHT_STRENGTH * (1.0 - targets)
+
+    squared_error = (predictions - targets) ** 2
+
+    return (weights * squared_error).sum() / weights.sum()
+
+
+# ---------------------------------------------------------
+# Degradation-aware sampling
+# ---------------------------------------------------------
+
+def create_balanced_sampler(dataset):
+    """
+    Sample degraded and clean images at approximately equal rates.
+
+    Sampling is with replacement, so some images may appear
+    multiple times and others may not appear in a given epoch.
+    """
+
+    degraded = np.asarray(dataset.is_degraded, dtype=bool)
+
+    n_degraded = int(degraded.sum())
+    n_clean = len(degraded) - n_degraded
+
+    print(f"Clean images:    {n_clean:,}")
+    print(f"Degraded images: {n_degraded:,}")
+
+    if n_degraded == 0 or n_clean == 0:
+        print("Only one image category found; using uniform sampling.")
+        weights = np.ones(len(dataset), dtype=np.float64)
+    else:
+        weights = np.where(
+            degraded,
+            DEGRADED_SAMPLE_FRACTION / n_degraded,
+            (1.0 - DEGRADED_SAMPLE_FRACTION) / n_clean,
+        )
+
+    generator = torch.Generator()
+    generator.manual_seed(RANDOM_SEED)
+
+    return WeightedRandomSampler(
+        weights=torch.as_tensor(weights, dtype=torch.double),
+        num_samples=len(dataset),
+        replacement=True,
+        generator=generator,
+    )
+
+
+# ---------------------------------------------------------
 # One epoch
 # ---------------------------------------------------------
 
-def run_epoch(model, loader, criterion, device, optimizer=None):
+def run_epoch(model, loader, device, optimizer=None):
     """
-    Run one training or validation epoch.
+    Training:
+        Weighted MSE.
 
-    If optimizer is provided, update model parameters.
-    Otherwise, evaluate without gradients.
+    Validation:
+        Standard MSE and category-specific MAE.
     """
 
     training = optimizer is not None
     model.train(training)
 
-    total_loss = 0.0
+    total_weighted_loss = 0.0
+    total_weight = 0.0
+
+    total_squared_error = 0.0
     total_absolute_error = 0.0
     total_elements = 0
+
+    category_error = {
+        "clean": 0.0,
+        "degraded": 0.0,
+        "severe": 0.0,
+    }
+
+    category_count = {
+        "clean": 0,
+        "degraded": 0,
+        "severe": 0,
+    }
 
     context = torch.enable_grad() if training else torch.no_grad()
 
@@ -179,25 +278,61 @@ def run_epoch(model, loader, criterion, device, optimizer=None):
             targets = targets.to(device)
 
             predictions = model(features)
-            loss = criterion(predictions, targets)
+
+            weights = (
+                1.0
+                + LOSS_WEIGHT_STRENGTH * (1.0 - targets)
+            )
+
+            squared_error = (predictions - targets) ** 2
+            absolute_error = torch.abs(predictions - targets)
+
+            loss = weighted_mse(predictions, targets)
 
             if training:
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
 
-            batch_elements = targets.numel()
-
-            total_loss += loss.item() * batch_elements
-            total_absolute_error += (
-                torch.abs(predictions - targets).sum().item()
+            total_weighted_loss += (
+                (weights * squared_error).sum().item()
             )
-            total_elements += batch_elements
+            total_weight += weights.sum().item()
 
-    return {
-        "mse": total_loss / total_elements,
+            total_squared_error += squared_error.sum().item()
+            total_absolute_error += absolute_error.sum().item()
+            total_elements += targets.numel()
+
+            masks = {
+                "clean": targets >= 0.95,
+                "degraded": targets < 0.8,
+                "severe": targets < 0.5,
+            }
+
+            for category, mask in masks.items():
+                category_error[category] += (
+                    absolute_error[mask].sum().item()
+                )
+                category_count[category] += mask.sum().item()
+
+    metrics = {
+        "weighted_mse": total_weighted_loss / total_weight,
+        "mse": total_squared_error / total_elements,
         "mae": total_absolute_error / total_elements,
     }
+
+    for category in category_error:
+        count = category_count[category]
+
+        metrics[f"{category}_mae"] = (
+            category_error[category] / count
+            if count > 0
+            else float("nan")
+        )
+
+        metrics[f"{category}_count"] = count
+
+    return metrics
 
 
 # ---------------------------------------------------------
@@ -205,9 +340,9 @@ def run_epoch(model, loader, criterion, device, optimizer=None):
 # ---------------------------------------------------------
 
 def train_modality(modality, device):
-    print(f"\n{'=' * 50}")
+    print(f"\n{'=' * 55}")
     print(f"Training {modality.upper()} quality estimator")
-    print(f"{'=' * 50}")
+    print(f"{'=' * 55}")
 
     train_dataset = QualityFeatureDataset(
         modality=modality,
@@ -219,10 +354,12 @@ def train_modality(modality, device):
         split="val",
     )
 
+    sampler = create_balanced_sampler(train_dataset)
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=BATCH_SIZE,
-        shuffle=True,
+        sampler=sampler,
         num_workers=0,
     )
 
@@ -233,7 +370,6 @@ def train_modality(modality, device):
         num_workers=0,
     )
 
-    # Infer the channel count from the saved encoder features.
     sample_features, _ = train_dataset[0]
     in_channels = sample_features.shape[0]
 
@@ -241,7 +377,6 @@ def train_modality(modality, device):
         in_channels=in_channels
     ).to(device)
 
-    criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(
         model.parameters(),
         lr=LEARNING_RATE,
@@ -258,16 +393,19 @@ def train_modality(modality, device):
         CHECKPOINT_ROOT / f"quality_{modality}.pt"
     )
 
-    print(f"Train samples: {len(train_dataset)}")
-    print(f"Val samples:   {len(val_dataset)}")
+    print(f"Train samples:  {len(train_dataset):,}")
+    print(f"Val samples:    {len(val_dataset):,}")
     print(f"Input channels: {in_channels}")
-    print(f"Device: {device}\n")
+    print(f"Device:         {device}")
+    print(f"Loss strength:  {LOSS_WEIGHT_STRENGTH}")
+    print(f"Target degraded sampling: "
+          f"{DEGRADED_SAMPLE_FRACTION:.0%}\n")
 
     for epoch in range(1, EPOCHS + 1):
+
         train_metrics = run_epoch(
             model,
             train_loader,
-            criterion,
             device,
             optimizer=optimizer,
         )
@@ -275,17 +413,37 @@ def train_modality(modality, device):
         val_metrics = run_epoch(
             model,
             val_loader,
-            criterion,
             device,
         )
 
         print(
             f"Epoch {epoch:02d}/{EPOCHS} | "
-            f"Train MSE: {train_metrics['mse']:.5f} | "
+            f"Train Weighted MSE: "
+            f"{train_metrics['weighted_mse']:.5f} | "
             f"Val MSE: {val_metrics['mse']:.5f} | "
             f"Val MAE: {val_metrics['mae']:.5f}"
         )
 
+        print(
+            f"  Val Clean MAE:    "
+            f"{val_metrics['clean_mae']:.5f} | "
+            f"n={val_metrics['clean_count']:,}"
+        )
+
+        print(
+            f"  Val Degraded MAE: "
+            f"{val_metrics['degraded_mae']:.5f} | "
+            f"n={val_metrics['degraded_count']:,}"
+        )
+
+        print(
+            f"  Val Severe MAE:   "
+            f"{val_metrics['severe_mae']:.5f} | "
+            f"n={val_metrics['severe_count']:,}"
+        )
+
+        # Select checkpoint using unweighted validation MSE,
+        # preserving comparability with the original baseline.
         if val_metrics["mse"] < best_val_loss:
             best_val_loss = val_metrics["mse"]
 
@@ -296,6 +454,10 @@ def train_modality(modality, device):
                     "in_channels": in_channels,
                     "epoch": epoch,
                     "val_mse": best_val_loss,
+                    "val_mae": val_metrics["mae"],
+                    "val_degraded_mae": val_metrics["degraded_mae"],
+                    "loss_weight_strength": LOSS_WEIGHT_STRENGTH,
+                    "degraded_sample_fraction": DEGRADED_SAMPLE_FRACTION,
                 },
                 checkpoint_path,
             )
