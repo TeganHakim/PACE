@@ -43,9 +43,9 @@ CHECKPOINT_ROOT = QUALITY_ROOT / "checkpoints"
 
 MODALITIES = ("rgb", "ir")
 
-EPOCHS = 20
+EPOCHS = 100
 BATCH_SIZE = 4
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 1e-5
 RANDOM_SEED = 42
 
 # Weighted MSE:
@@ -55,7 +55,7 @@ LOSS_WEIGHT_STRENGTH = 4.0
 
 # Image-level sampling:
 # Images with any patch below this threshold are considered degraded.
-DEGRADED_THRESHOLD = 0.8
+DEGRADED_THRESHOLD = 0.7
 
 # Target fraction of degraded images drawn per training epoch.
 # This balances image categories, not individual patch categories.
