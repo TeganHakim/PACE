@@ -1,0 +1,6 @@
+10/21
+
+- smaller learnring rate, -5
+- adaptive learning rate / schedule
+- sgd and not adam
+- then do an existing architecture if needed (like res net)  --> look into pretrained model 

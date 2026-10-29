@@ -78,7 +78,7 @@ class ReliabilityGate(nn.Module):
 
         soft_gate = torch.sigmoid(logits)
 
-        hard_gate = (soft_gate > 0.5).float()
+        hard_gate = (soft_gate > 0.26).float() # 0.26 was empirically shown to be a better threshold than 0.5 
 
         # This is the trick: equates to just hard_gate
         gate = hard_gate.detach() - soft_gate.detach() + soft_gate
