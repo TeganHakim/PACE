@@ -2,29 +2,16 @@
 """
 PACE: End-to-end selective local CrossFuse inference.
 
-Pipeline:
-    RGB + IR images
-        -> Pretrained CrossFuse encoders
-        -> Trained RGB/IR quality estimators
-        -> Trained reliability gate
-        -> Selective local CrossFuse
-        -> Fused image
+Quality estimation uses original-resolution images, matching
+the quality estimator's training and visualization pipeline.
 
-Run from repository root:
-
-python prototyping/selective_fusion/inference.py \
-    --split val \
-    --limit 5 \
-    --quality-source predicted \
-    --gate-mode trained \
-    --device cpu
+Selective fusion continues to use 256x256 images.
 """
 
 import argparse
 import csv
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
 import cv2
 import numpy as np
@@ -119,23 +106,13 @@ def load_models(
     batch_size=16,
 ):
     """
-    Load pretrained encoders, CrossFuse, quality estimators,
-    reliability gate, and local fusion.
-
     Returns:
         encoders
         selective
         estimators
         scales
         gate_model
-
-    selective.baseline is retained for compatibility with
-    the validation scripts.
     """
-
-    # --------------------------------------------------
-    # Pretrained encoders
-    # --------------------------------------------------
 
     encoders = {
         modality: load_encoder(modality, device).eval()
@@ -144,10 +121,6 @@ def load_models(
 
     for encoder in encoders.values():
         encoder.requires_grad_(False)
-
-    # --------------------------------------------------
-    # Original pretrained CrossFuse
-    # --------------------------------------------------
 
     baseline = Trans_FuseNet(**FUSION_CONFIG)
 
@@ -171,10 +144,6 @@ def load_models(
         .requires_grad_(False)
     )
 
-    # --------------------------------------------------
-    # Local CrossFuse
-    # --------------------------------------------------
-
     local_model = LocalCrossFuse(
         rgb_encoder=encoders["rgb"],
         ir_encoder=encoders["ir"],
@@ -184,21 +153,13 @@ def load_models(
         batch_size=batch_size,
     ).to(device).eval()
 
-    # Keep .baseline accessible to existing validation code.
-    # LocalCrossFuse already exposes self.baseline.
     selective = local_model
-
-    # --------------------------------------------------
-    # Trained quality estimators
-    # --------------------------------------------------
 
     estimators = {}
     scales = {}
 
     if quality_source == "predicted":
-
         for modality in ("rgb", "ir"):
-
             path = (
                 ROOT
                 / "prototyping"
@@ -230,14 +191,15 @@ def load_models(
                 metadata.get("extra_feature_scale", 10.0)
             )
 
-    # --------------------------------------------------
-    # Trained reliability gate
-    # --------------------------------------------------
+            print(
+                f"{modality.upper()} estimator: {path} "
+                f"| epoch={metadata.get('epoch', '?')} "
+                f"| scale={scales[modality]}"
+            )
 
     gate_model = None
 
     if gate_mode == "trained":
-
         path = (
             ROOT
             / "prototyping"
@@ -274,7 +236,50 @@ def load_models(
     )
 
 
+def load_quality_image(path, modality, device):
+    """
+    Match QualityImageDataset and the working notebook.
+
+    RGB: read color, then BGR -> grayscale.
+    IR: read grayscale directly.
+
+    IMPORTANT: no resizing.
+
+    Returns [1, 1, H, W] in [0, 1].
+    """
+    read_mode = (
+        cv2.IMREAD_GRAYSCALE
+        if modality == "ir"
+        else cv2.IMREAD_COLOR
+    )
+
+    image = cv2.imread(str(path), read_mode)
+
+    if image is None:
+        raise FileNotFoundError(path)
+
+    if modality == "rgb":
+        image = cv2.cvtColor(
+            image,
+            cv2.COLOR_BGR2GRAY,
+        )
+
+    image = image.astype(np.float32) / 255.0
+
+    return (
+        torch.from_numpy(image)
+        .unsqueeze(0)
+        .unsqueeze(0)
+        .to(device)
+    )
+
+
 def load_image(path, device):
+    """
+    Load an image for local CrossFuse fusion.
+
+    Returns [1, 1, 256, 256] in [0, 1].
+    """
     image = cv2.imread(
         str(path),
         cv2.IMREAD_GRAYSCALE,
@@ -326,6 +331,13 @@ def predict_quality(
     image_01,
     deep_features,
 ):
+    """
+    Match quality_estimator/train.py:
+
+    128-channel CrossFuse deep features
+    + four degradation-aware features
+    = 132 channels.
+    """
     extra = degradation_features(image_01)
 
     extra = F.adaptive_avg_pool2d(
@@ -342,6 +354,30 @@ def predict_quality(
     )
 
     return estimator(features)
+
+
+@torch.inference_mode()
+def predict_quality_from_original(
+    encoder,
+    estimator,
+    scale,
+    image_01,
+):
+    """
+    Predict using original-resolution image features,
+    exactly as in the working quality notebook.
+    """
+    _, deep = extract_features(
+        encoder,
+        image_01 * 255.0,
+    )
+
+    return predict_quality(
+        estimator,
+        scale,
+        image_01,
+        deep,
+    )
 
 
 def samples(split, limit):
@@ -361,7 +397,11 @@ def samples(split, limit):
 
         if all(
             p.is_file()
-            for p in (rgb_path, ir_path, ir_qpath)
+            for p in (
+                rgb_path,
+                ir_path,
+                ir_qpath,
+            )
         ):
             found.append(
                 (
@@ -388,9 +428,6 @@ def samples(split, limit):
 
 
 def save_image(tensor, path):
-    """
-    Save an image normalized to [0,1].
-    """
     image = (
         tensor[0, 0]
         .clamp(0, 1)
@@ -402,7 +439,9 @@ def save_image(tensor, path):
     )
 
     if not cv2.imwrite(str(path), image):
-        raise RuntimeError(f"Failed to save {path}")
+        raise RuntimeError(
+            f"Failed to save {path}"
+        )
 
 
 @torch.inference_mode()
@@ -418,18 +457,18 @@ def run_pipeline(
     gate_mode="trained",
     rgb_qpath=None,
     ir_qpath=None,
+    rgb_original=None,
+    ir_original=None,
 ):
     """
-    Execute the complete selective fusion pipeline.
+    rgb, ir:
+        256x256 tensors used for fusion.
 
-    Encoder features are computed once and reused by
-    quality estimation and local fusion.
+    rgb_original, ir_original:
+        Native-resolution tensors used for quality estimation.
     """
 
-    # --------------------------------------------------
-    # Encode both modalities once
-    # --------------------------------------------------
-
+    # Fusion-resolution encoder features.
     rgb_sh, rgb_de = extract_features(
         encoders["rgb"],
         rgb * 255.0,
@@ -440,39 +479,48 @@ def run_pipeline(
         ir * 255.0,
     )
 
-    # --------------------------------------------------
-    # Estimate quality
-    # --------------------------------------------------
-
     if quality_source == "ground_truth":
-
         if rgb_qpath is None or ir_qpath is None:
             raise ValueError(
                 "Ground-truth quality paths are required"
             )
 
-        rgb_q = load_quality(rgb_qpath, rgb.device)
-        ir_q = load_quality(ir_qpath, ir.device)
+        rgb_q = load_quality(
+            rgb_qpath,
+            rgb.device,
+        )
 
-    else:
+        ir_q = load_quality(
+            ir_qpath,
+            ir.device,
+        )
 
-        rgb_q = predict_quality(
+    elif quality_source == "predicted":
+        if rgb_original is None or ir_original is None:
+            raise ValueError(
+                "Predicted quality requires original-resolution "
+                "RGB and IR images."
+            )
+
+        # Native-resolution feature extraction.
+        rgb_q = predict_quality_from_original(
+            encoders["rgb"],
             estimators["rgb"],
             scales["rgb"],
-            rgb,
-            rgb_de,
+            rgb_original,
         )
 
-        ir_q = predict_quality(
+        ir_q = predict_quality_from_original(
+            encoders["ir"],
             estimators["ir"],
             scales["ir"],
-            ir,
-            ir_de,
+            ir_original,
         )
 
-    # --------------------------------------------------
-    # Reliability gate
-    # --------------------------------------------------
+    else:
+        raise ValueError(
+            f"Unknown quality source: {quality_source}"
+        )
 
     if gate_mode == "all_on":
         gate = torch.ones_like(rgb_q)
@@ -480,7 +528,7 @@ def run_pipeline(
     elif gate_mode == "all_off":
         gate = torch.zeros_like(rgb_q)
 
-    else:
+    elif gate_mode == "trained":
         if gate_model is None:
             raise ValueError(
                 "Trained gate model was not loaded"
@@ -488,9 +536,10 @@ def run_pipeline(
 
         gate = gate_model(rgb_q, ir_q)
 
-    # --------------------------------------------------
-    # Selective local CrossFuse
-    # --------------------------------------------------
+    else:
+        raise ValueError(
+            f"Unknown gate mode: {gate_mode}"
+        )
 
     output = local_model(
         rgb=rgb,
@@ -597,7 +646,6 @@ def main():
     results = []
 
     with torch.inference_mode():
-
         for (
             stem,
             rgb_path,
@@ -606,8 +654,26 @@ def main():
             ir_qpath,
         ) in samples(args.split, args.limit):
 
+            # 256x256 fusion inputs.
             rgb = load_image(rgb_path, device)
             ir = load_image(ir_path, device)
+
+            # Original-resolution quality inputs.
+            rgb_original = None
+            ir_original = None
+
+            if args.quality_source == "predicted":
+                rgb_original = load_quality_image(
+                    rgb_path,
+                    "rgb",
+                    device,
+                )
+
+                ir_original = load_quality_image(
+                    ir_path,
+                    "ir",
+                    device,
+                )
 
             output, rgb_q, ir_q, gate = run_pipeline(
                 encoders=encoders,
@@ -621,6 +687,8 @@ def main():
                 gate_mode=args.gate_mode,
                 rgb_qpath=rgb_qpath,
                 ir_qpath=ir_qpath,
+                rgb_original=rgb_original,
+                ir_original=ir_original,
             )
 
             prefix = f"{args.split}_{stem}"
@@ -636,17 +704,20 @@ def main():
             )
 
             np.save(
-                args.output / f"{prefix}_gate.npy",
+                args.output
+                / f"{prefix}_gate.npy",
                 gate[0, 0].cpu().numpy(),
             )
 
             np.save(
-                args.output / f"{prefix}_rgb_quality.npy",
+                args.output
+                / f"{prefix}_rgb_quality.npy",
                 rgb_q[0, 0].cpu().numpy(),
             )
 
             np.save(
-                args.output / f"{prefix}_ir_quality.npy",
+                args.output
+                / f"{prefix}_ir_quality.npy",
                 ir_q[0, 0].cpu().numpy(),
             )
 
@@ -668,13 +739,26 @@ def main():
                 f"({fusion_rate:.1%})"
             )
 
+            print(
+                f"  RGB quality: "
+                f"min={rgb_q.min().item():.3f}, "
+                f"mean={rgb_q.mean().item():.3f}, "
+                f"max={rgb_q.max().item():.3f}"
+            )
+
+            print(
+                f"  IR quality:  "
+                f"min={ir_q.min().item():.3f}, "
+                f"mean={ir_q.mean().item():.3f}, "
+                f"max={ir_q.max().item():.3f}"
+            )
+
     summary_path = args.output / "summary.csv"
 
     with summary_path.open(
         "w",
         newline="",
     ) as file:
-
         writer = csv.DictWriter(
             file,
             fieldnames=[
