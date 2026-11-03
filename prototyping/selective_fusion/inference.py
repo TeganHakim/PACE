@@ -1,19 +1,30 @@
 
 """
-PACE selective TransFuse inference.
+PACE: End-to-end selective local CrossFuse inference.
+
+Pipeline:
+    RGB + IR images
+        -> Pretrained CrossFuse encoders
+        -> Trained RGB/IR quality estimators
+        -> Trained reliability gate
+        -> Selective local CrossFuse
+        -> Fused image
 
 Run from repository root:
 
 python prototyping/selective_fusion/inference.py \
-    --split val --limit 5 \
+    --split val \
+    --limit 5 \
     --quality-source predicted \
-    --gate-mode trained
+    --gate-mode trained \
+    --device cpu
 """
 
 import argparse
 import csv
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import cv2
 import numpy as np
@@ -37,7 +48,7 @@ from model import SpatialQualityEstimator
 from degradation_features import degradation_features
 from reliability_gate import ReliabilityGate
 from network.net_conv_trans import Trans_FuseNet
-from selective_transfuse import SelectiveTransFuse
+from local_crossfuse import LocalCrossFuse
 
 
 FUSION_CONFIG = dict(
@@ -61,10 +72,13 @@ FUSION_CONFIG = dict(
 def choose_device(request):
     if request != "auto":
         device = torch.device(request)
+
         if device.type == "cuda" and not torch.cuda.is_available():
             raise RuntimeError("CUDA is unavailable")
+
         if device.type == "mps" and not torch.backends.mps.is_available():
             raise RuntimeError("MPS is unavailable")
+
         return device
 
     if torch.cuda.is_available():
@@ -101,17 +115,40 @@ def load_models(
     device,
     quality_source="predicted",
     gate_mode="trained",
+    context_features=8,
+    batch_size=16,
 ):
-    # Frozen pretrained encoders.
+    """
+    Load pretrained encoders, CrossFuse, quality estimators,
+    reliability gate, and local fusion.
+
+    Returns:
+        encoders
+        selective
+        estimators
+        scales
+        gate_model
+
+    selective.baseline is retained for compatibility with
+    the validation scripts.
+    """
+
+    # --------------------------------------------------
+    # Pretrained encoders
+    # --------------------------------------------------
+
     encoders = {
-        m: load_encoder(m, device).eval()
-        for m in ("rgb", "ir")
+        modality: load_encoder(modality, device).eval()
+        for modality in ("rgb", "ir")
     }
 
     for encoder in encoders.values():
         encoder.requires_grad_(False)
 
-    # Original CrossFuse model.
+    # --------------------------------------------------
+    # Original pretrained CrossFuse
+    # --------------------------------------------------
+
     baseline = Trans_FuseNet(**FUSION_CONFIG)
 
     checkpoint = (
@@ -134,18 +171,34 @@ def load_models(
         .requires_grad_(False)
     )
 
-    selective = (
-        SelectiveTransFuse(baseline)
-        .to(device)
-        .eval()
-        .requires_grad_(False)
-    )
+    # --------------------------------------------------
+    # Local CrossFuse
+    # --------------------------------------------------
+
+    local_model = LocalCrossFuse(
+        rgb_encoder=encoders["rgb"],
+        ir_encoder=encoders["ir"],
+        baseline=baseline,
+        grid_size=8,
+        context_features=context_features,
+        batch_size=batch_size,
+    ).to(device).eval()
+
+    # Keep .baseline accessible to existing validation code.
+    # LocalCrossFuse already exposes self.baseline.
+    selective = local_model
+
+    # --------------------------------------------------
+    # Trained quality estimators
+    # --------------------------------------------------
 
     estimators = {}
     scales = {}
 
     if quality_source == "predicted":
+
         for modality in ("rgb", "ir"):
+
             path = (
                 ROOT
                 / "prototyping"
@@ -157,7 +210,9 @@ def load_models(
             weights, metadata = state(path, device)
 
             estimator = SpatialQualityEstimator(
-                int(metadata.get("in_channels", 132))
+                in_channels=int(
+                    metadata.get("in_channels", 132)
+                )
             )
 
             estimator.load_state_dict(
@@ -175,9 +230,14 @@ def load_models(
                 metadata.get("extra_feature_scale", 10.0)
             )
 
+    # --------------------------------------------------
+    # Trained reliability gate
+    # --------------------------------------------------
+
     gate_model = None
 
     if gate_mode == "trained":
+
         path = (
             ROOT
             / "prototyping"
@@ -328,9 +388,14 @@ def samples(split, limit):
 
 
 def save_image(tensor, path):
+    """
+    Save an image normalized to [0,1].
+    """
     image = (
         tensor[0, 0]
-        .clamp(0, 255)
+        .clamp(0, 1)
+        .mul(255)
+        .round()
         .byte()
         .cpu()
         .numpy()
@@ -338,6 +403,110 @@ def save_image(tensor, path):
 
     if not cv2.imwrite(str(path), image):
         raise RuntimeError(f"Failed to save {path}")
+
+
+@torch.inference_mode()
+def run_pipeline(
+    encoders,
+    local_model,
+    estimators,
+    scales,
+    gate_model,
+    rgb,
+    ir,
+    quality_source="predicted",
+    gate_mode="trained",
+    rgb_qpath=None,
+    ir_qpath=None,
+):
+    """
+    Execute the complete selective fusion pipeline.
+
+    Encoder features are computed once and reused by
+    quality estimation and local fusion.
+    """
+
+    # --------------------------------------------------
+    # Encode both modalities once
+    # --------------------------------------------------
+
+    rgb_sh, rgb_de = extract_features(
+        encoders["rgb"],
+        rgb * 255.0,
+    )
+
+    ir_sh, ir_de = extract_features(
+        encoders["ir"],
+        ir * 255.0,
+    )
+
+    # --------------------------------------------------
+    # Estimate quality
+    # --------------------------------------------------
+
+    if quality_source == "ground_truth":
+
+        if rgb_qpath is None or ir_qpath is None:
+            raise ValueError(
+                "Ground-truth quality paths are required"
+            )
+
+        rgb_q = load_quality(rgb_qpath, rgb.device)
+        ir_q = load_quality(ir_qpath, ir.device)
+
+    else:
+
+        rgb_q = predict_quality(
+            estimators["rgb"],
+            scales["rgb"],
+            rgb,
+            rgb_de,
+        )
+
+        ir_q = predict_quality(
+            estimators["ir"],
+            scales["ir"],
+            ir,
+            ir_de,
+        )
+
+    # --------------------------------------------------
+    # Reliability gate
+    # --------------------------------------------------
+
+    if gate_mode == "all_on":
+        gate = torch.ones_like(rgb_q)
+
+    elif gate_mode == "all_off":
+        gate = torch.zeros_like(rgb_q)
+
+    else:
+        if gate_model is None:
+            raise ValueError(
+                "Trained gate model was not loaded"
+            )
+
+        gate = gate_model(rgb_q, ir_q)
+
+    # --------------------------------------------------
+    # Selective local CrossFuse
+    # --------------------------------------------------
+
+    output = local_model(
+        rgb=rgb,
+        ir=ir,
+        rgb_quality=rgb_q,
+        ir_quality=ir_q,
+        gate=gate,
+        encoded_features=(
+            rgb_sh,
+            rgb_de,
+            ir_sh,
+            ir_de,
+        ),
+    )
+
+    return output, rgb_q, ir_q, gate
 
 
 def main():
@@ -373,6 +542,18 @@ def main():
     )
 
     parser.add_argument(
+        "--context-features",
+        type=int,
+        default=8,
+    )
+
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=16,
+    )
+
+    parser.add_argument(
         "--output",
         type=Path,
         default=(
@@ -396,14 +577,16 @@ def main():
 
     (
         encoders,
-        model,
+        local_model,
         estimators,
         scales,
         gate_model,
     ) = load_models(
         device,
-        args.quality_source,
-        args.gate_mode,
+        quality_source=args.quality_source,
+        gate_mode=args.gate_mode,
+        context_features=args.context_features,
+        batch_size=args.batch_size,
     )
 
     args.output.mkdir(
@@ -414,6 +597,7 @@ def main():
     results = []
 
     with torch.inference_mode():
+
         for (
             stem,
             rgb_path,
@@ -425,62 +609,18 @@ def main():
             rgb = load_image(rgb_path, device)
             ir = load_image(ir_path, device)
 
-            rgb_sh, rgb_de = extract_features(
-                encoders["rgb"],
-                rgb * 255,
-            )
-
-            ir_sh, ir_de = extract_features(
-                encoders["ir"],
-                ir * 255,
-            )
-
-            if args.quality_source == "ground_truth":
-                rgb_q = load_quality(
-                    rgb_qpath,
-                    device,
-                )
-
-                ir_q = load_quality(
-                    ir_qpath,
-                    device,
-                )
-
-            else:
-                rgb_q = predict_quality(
-                    estimators["rgb"],
-                    scales["rgb"],
-                    rgb,
-                    rgb_de,
-                )
-
-                ir_q = predict_quality(
-                    estimators["ir"],
-                    scales["ir"],
-                    ir,
-                    ir_de,
-                )
-
-            if args.gate_mode == "all_on":
-                gate = torch.ones_like(rgb_q)
-
-            elif args.gate_mode == "all_off":
-                gate = torch.zeros_like(rgb_q)
-
-            else:
-                gate = gate_model(
-                    rgb_q,
-                    ir_q,
-                )
-
-            output = model(
-                ir_sh,
-                ir_de,
-                rgb_sh,
-                rgb_de,
-                rgb_q,
-                ir_q,
-                gate,
+            output, rgb_q, ir_q, gate = run_pipeline(
+                encoders=encoders,
+                local_model=local_model,
+                estimators=estimators,
+                scales=scales,
+                gate_model=gate_model,
+                rgb=rgb,
+                ir=ir,
+                quality_source=args.quality_source,
+                gate_mode=args.gate_mode,
+                rgb_qpath=rgb_qpath,
+                ir_qpath=ir_qpath,
             )
 
             prefix = f"{args.split}_{stem}"
@@ -496,20 +636,17 @@ def main():
             )
 
             np.save(
-                args.output
-                / f"{prefix}_gate.npy",
+                args.output / f"{prefix}_gate.npy",
                 gate[0, 0].cpu().numpy(),
             )
 
             np.save(
-                args.output
-                / f"{prefix}_rgb_quality.npy",
+                args.output / f"{prefix}_rgb_quality.npy",
                 rgb_q[0, 0].cpu().numpy(),
             )
 
             np.save(
-                args.output
-                / f"{prefix}_ir_quality.npy",
+                args.output / f"{prefix}_ir_quality.npy",
                 ir_q[0, 0].cpu().numpy(),
             )
 
@@ -527,18 +664,17 @@ def main():
             print(
                 f"{prefix}: "
                 f"{int(gate.sum().item())}/64 "
-                f"cells cross-attended "
+                f"patches fused "
                 f"({fusion_rate:.1%})"
             )
 
-    summary_path = (
-        args.output / "summary.csv"
-    )
+    summary_path = args.output / "summary.csv"
 
     with summary_path.open(
         "w",
         newline="",
     ) as file:
+
         writer = csv.DictWriter(
             file,
             fieldnames=[
