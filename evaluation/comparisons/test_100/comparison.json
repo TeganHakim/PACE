@@ -1,0 +1,433 @@
+{
+  "crossfuse_directory": "/home/nvidia/PACE/baseline/CrossFuse/evaluation/baseline_epoch_28_test_100",
+  "pace_directory": "/home/nvidia/PACE/pace/evaluation/pace_test_100",
+  "crossfuse_detection": {
+    "precision": 0.9655172413793104,
+    "recall": 0.6750115901715346,
+    "f1": 0.7945429740791269,
+    "map50": 0.3091960847377777,
+    "map50_95": 0.20498612523078918
+  },
+  "pace_detection": {
+    "precision": 0.9550281074328545,
+    "recall": 0.7088548910523875,
+    "f1": 0.8137307078233101,
+    "map50": 0.30153688788414,
+    "map50_95": 0.2009357064962387
+  },
+  "crossfuse_per_class": {
+    "car": {
+      "ap": 0.6048848628997803,
+      "recall": 0.6683892011642456
+    },
+    "truck": {
+      "ap": 0.0,
+      "recall": 0.0
+    },
+    "bus": {
+      "ap": 0.010073507204651833,
+      "recall": 0.1666666716337204
+    },
+    "van": {
+      "ap": -1.0,
+      "recall": -1.0
+    },
+    "freight car": {
+      "ap": -1.0,
+      "recall": -1.0
+    }
+  },
+  "pace_per_class": {
+    "car": {
+      "ap": 0.5993019342422485,
+      "recall": 0.6631284952163696
+    },
+    "truck": {
+      "ap": 0.0,
+      "recall": 0.0
+    },
+    "bus": {
+      "ap": 0.0035051547456532717,
+      "recall": 0.18333333730697632
+    },
+    "van": {
+      "ap": -1.0,
+      "recall": -1.0
+    },
+    "freight car": {
+      "ap": -1.0,
+      "recall": -1.0
+    }
+  },
+  "crossfuse_subsets": {
+    "clean": {
+      "count": 66.0,
+      "map50": 0.30766358971595764,
+      "map50_95": 0.20147670805454254,
+      "precision": 0.9613733905579399,
+      "recall": 0.6502177068214804,
+      "f1": 0.7757575757575758
+    },
+    "degraded": {
+      "count": 34.0,
+      "map50": 0.3346562087535858,
+      "map50_95": 0.2319471687078476,
+      "precision": 0.9722222222222222,
+      "recall": 0.7188703465982028,
+      "f1": 0.8265682656826568
+    }
+  },
+  "pace_subsets": {
+    "clean": {
+      "count": 66.0,
+      "map50": 0.29989928007125854,
+      "map50_95": 0.19871553778648376,
+      "precision": 0.9523336643495531,
+      "recall": 0.6959361393323658,
+      "f1": 0.8041928721174005
+    },
+    "degraded": {
+      "count": 34.0,
+      "map50": 0.31479763984680176,
+      "map50_95": 0.2145875245332718,
+      "precision": 0.9595959595959596,
+      "recall": 0.7317073170731707,
+      "f1": 0.830298616168973
+    }
+  },
+  "crossfuse_latency": {
+    "encoder_ms": {
+      "mean": 5.049563190223125,
+      "median": 5.052516999057843,
+      "p95": 5.169343800480419,
+      "min": 4.867554001975805,
+      "max": 5.239025002083508
+    },
+    "fusion_ms": {
+      "mean": 56.42621117003728,
+      "median": 56.373231498582754,
+      "p95": 56.8648104021122,
+      "min": 56.02997100140783,
+      "max": 57.60046800060081
+    },
+    "detection_nms_ms": {
+      "mean": 7.363833260133106,
+      "median": 7.290224501048215,
+      "p95": 7.807327598675329,
+      "min": 6.85380799768609,
+      "max": 11.013430001185043
+    },
+    "end_to_end_ms": {
+      "mean": 68.83960762039351,
+      "median": 68.71666900042328,
+      "p95": 69.64208965164289,
+      "min": 67.95429699923261,
+      "max": 72.63822100139805
+    },
+    "cross_attention_block_ms": {
+      "mean": 49.205586449897964,
+      "median": 49.179203999301535,
+      "p95": 49.529005001568294,
+      "min": 48.90238499865518,
+      "max": 50.22012299741618
+    },
+    "fps_from_mean_latency": {
+      "mean": 14.52652091677166
+    },
+    "cuda_peak_allocated_mb": {
+      "mean": 227.7197265625
+    }
+  },
+  "pace_latency": {
+    "encoder_quality_gate_ms": {
+      "mean": 37.62217979003708,
+      "median": 37.68941399994219,
+      "p95": 38.07181714971648,
+      "min": 36.6206990001956,
+      "max": 39.33907900000122
+    },
+    "selective_fusion_ms": {
+      "mean": 9.54107592996479,
+      "median": 0.8485139999265812,
+      "p95": 31.381535399918903,
+      "min": 0.528002999999444,
+      "max": 43.85712399971453
+    },
+    "detection_nms_ms": {
+      "mean": 12.866069320011775,
+      "median": 13.10891250000168,
+      "p95": 14.226407999831281,
+      "min": 10.308595000424248,
+      "max": 15.844045999983791
+    },
+    "end_to_end_ms": {
+      "mean": 60.029325040013646,
+      "median": 53.31095499991534,
+      "p95": 80.07997224990504,
+      "min": 48.14158800036239,
+      "max": 92.07292600012806
+    },
+    "fps_from_mean_latency": {
+      "mean": 16.658524801560432
+    },
+    "cuda_peak_allocated_mb": {
+      "mean": 547.8515625
+    }
+  },
+  "crossfuse_parameters": {
+    "total": 23391650.0,
+    "detector": 2590527.0,
+    "fusion_without_detector": 20801123.0,
+    "rgb_encoder": 1254529.0,
+    "ir_encoder": 1254529.0
+  },
+  "pace_parameters": {
+    "rgb_encoder": 1254529.0,
+    "ir_encoder": 1254529.0,
+    "rgb_quality_estimator": 94593.0,
+    "ir_quality_estimator": 94593.0,
+    "reliability_gate": 337.0,
+    "local_fusion": 25900708.0,
+    "detector": 2590527.0,
+    "total_including_detector": 31189816.0
+  },
+  "crossfuse_fusion_quality": {
+    "entropy": {
+      "mean": 7.222212734886693,
+      "median": 7.220808539909048,
+      "p95": 7.4478022778915065,
+      "min": 6.9221943716664605,
+      "max": 7.572167577623773
+    },
+    "spatial_frequency": {
+      "mean": 19.405766344070436,
+      "median": 19.258541107177734,
+      "p95": 23.632437992095948,
+      "min": 12.72950553894043,
+      "max": 30.238069534301758
+    },
+    "average_gradient": {
+      "mean": 8.777047700881958,
+      "median": 8.748642921447754,
+      "p95": 10.70760827064514,
+      "min": 5.780817985534668,
+      "max": 14.848191261291504
+    },
+    "mi_rgb": {
+      "mean": 0.1527295456597502,
+      "median": 0.07489047846997149,
+      "p95": 0.611688370411451,
+      "min": 0.007789559293320064,
+      "max": 1.127580823431715
+    },
+    "mi_ir": {
+      "mean": 2.97108511087427,
+      "median": 2.9975709455159767,
+      "p95": 3.177762125785762,
+      "min": 2.3699251374094534,
+      "max": 3.306265564225594
+    },
+    "mi_total": {
+      "mean": 3.123814656534021,
+      "median": 3.102910656288118,
+      "p95": 3.412994037838453,
+      "min": 2.7722717268930595,
+      "max": 4.12247606287532
+    }
+  },
+  "pace_fusion_quality": {
+    "entropy": {
+      "mean": 7.514319274536859,
+      "median": 7.523323516754356,
+      "p95": 7.628455139552651,
+      "min": 7.2254684879974045,
+      "max": 7.672614202977057
+    },
+    "spatial_frequency": {
+      "mean": 21.95825611114502,
+      "median": 21.818330764770508,
+      "p95": 26.41568841934204,
+      "min": 16.020849227905273,
+      "max": 30.68464469909668
+    },
+    "average_gradient": {
+      "mean": 9.498414797782898,
+      "median": 9.246329307556152,
+      "p95": 12.020786046981812,
+      "min": 6.7478179931640625,
+      "max": 15.020918846130371
+    },
+    "mi_rgb": {
+      "mean": 0.16244036394134462,
+      "median": 0.08172369568201579,
+      "p95": 0.6661617629591773,
+      "min": 0.007842158348145594,
+      "max": 0.9864803052620983
+    },
+    "mi_ir": {
+      "mean": 5.10363200559667,
+      "median": 5.405907584249452,
+      "p95": 5.599680570631934,
+      "min": 3.2049516543012015,
+      "max": 5.638185033977755
+    },
+    "mi_total": {
+      "mean": 5.266072369538015,
+      "median": 5.535214243264973,
+      "p95": 5.731417145832369,
+      "min": 3.2647939659701475,
+      "max": 5.95534784034977
+    }
+  },
+  "matched_sample_ids": [
+    "00001",
+    "00002",
+    "00003",
+    "00004",
+    "00005",
+    "00006",
+    "00007",
+    "00008",
+    "00009",
+    "00010",
+    "00011",
+    "00012",
+    "00013",
+    "00014",
+    "00015",
+    "00016",
+    "00017",
+    "00018",
+    "00019",
+    "00020",
+    "00021",
+    "00022",
+    "00023",
+    "00024",
+    "00025",
+    "00026",
+    "00027",
+    "00028",
+    "00029",
+    "00030",
+    "00031",
+    "00032",
+    "00033",
+    "00034",
+    "00035",
+    "00036",
+    "00037",
+    "00038",
+    "00039",
+    "00040",
+    "00041",
+    "00042",
+    "00043",
+    "00044",
+    "00045",
+    "00046",
+    "00047",
+    "00048",
+    "00049",
+    "00050",
+    "00051",
+    "00052",
+    "00053",
+    "00054",
+    "00055",
+    "00056",
+    "00057",
+    "00058",
+    "00059",
+    "00060",
+    "00061",
+    "00062",
+    "00063",
+    "00064",
+    "00065",
+    "00066",
+    "00067",
+    "00068",
+    "00069",
+    "00070",
+    "00071",
+    "00072",
+    "00073",
+    "00074",
+    "00075",
+    "00076",
+    "00077",
+    "00078",
+    "00079",
+    "00080",
+    "00081",
+    "00082",
+    "00083",
+    "00084",
+    "00085",
+    "00086",
+    "00087",
+    "00088",
+    "00089",
+    "00090",
+    "00091",
+    "00092",
+    "00093",
+    "00094",
+    "00095",
+    "00096",
+    "00097",
+    "00098",
+    "00099",
+    "00100"
+  ],
+  "visualization_gallery": {
+    "matched_panel_count": 12,
+    "matched_fused_count": 0,
+    "contact_sheets": [
+      "/home/nvidia/PACE/evaluation/comparisons/test_100/contact_sheets/contact_sheet_001.jpg",
+      "/home/nvidia/PACE/evaluation/comparisons/test_100/contact_sheets/contact_sheet_002.jpg"
+    ]
+  },
+  "charts": [
+    "detection_precision.png",
+    "detection_recall.png",
+    "detection_f1.png",
+    "detection_map50.png",
+    "detection_map50_95.png",
+    "detection_overview.png",
+    "per_class_ap.png",
+    "per_class_recall.png",
+    "subset_map50.png",
+    "subset_map50_95.png",
+    "subset_precision.png",
+    "subset_recall.png",
+    "subset_f1.png",
+    "degradation_degradation_type_precision.png",
+    "degradation_degradation_type_recall.png",
+    "degradation_degradation_type_f1.png",
+    "degradation_modality_precision.png",
+    "degradation_modality_recall.png",
+    "degradation_modality_f1.png",
+    "degradation_severity_precision.png",
+    "degradation_severity_recall.png",
+    "degradation_severity_f1.png",
+    "latency_mean.png",
+    "latency_median.png",
+    "latency_p95.png",
+    "latency_distribution.png",
+    "throughput_fps.png",
+    "memory_comparison.png",
+    "parameter_counts.png",
+    "fusion_quality_mean.png",
+    "fusion_quality_median.png",
+    "gate_activity.png",
+    "fused_mean_intensity.png",
+    "fused_max_intensity.png",
+    "sample_prediction_counts.png",
+    "sample_max_confidence.png",
+    "sample_ground_truth_counts.png",
+    "sample_latency_scatter.png",
+    "sample_prediction_scatter.png"
+  ]
+}
