@@ -22,13 +22,13 @@
 |---|---:|---:|
 | cross_attention_block_ms | 49.206 | N/A |
 | cuda_peak_allocated_mb | 227.720 | 547.852 |
-| detection_nms_ms | 7.364 | 12.866 |
+| detection_nms_ms | 7.364 | 13.196 |
 | encoder_ms | 5.050 | N/A |
-| encoder_quality_gate_ms | N/A | 37.622 |
-| end_to_end_ms | 68.840 | 60.029 |
-| fps_from_mean_latency | 14.527 | 16.659 |
+| encoder_quality_gate_ms | N/A | 37.549 |
+| end_to_end_ms | 68.840 | 60.591 |
+| fps_from_mean_latency | 14.527 | 16.504 |
 | fusion_ms | 56.426 | N/A |
-| selective_fusion_ms | N/A | 9.541 |
+| selective_fusion_ms | N/A | 9.845 |
 
 ## Parameter counts
 
