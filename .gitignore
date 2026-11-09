@@ -233,3 +233,7 @@ prototyping/quality_estimator/features.zip
 
 # macOS metadata
 .DS_Storepace/evaluation/
+
+# evaluation results too big to be stored in git
+pace/evaluation/
+baseline/CrossFuse/evaluation/

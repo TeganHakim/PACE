@@ -1,105 +1,103 @@
-# CrossFuse vs. PACE Evaluation Report
+# CrossFuse vs. PACE — paired evaluation
 
-## Evaluation runs
+Compared **100** matched samples.
 
-- **CrossFuse:** `/home/nvidia/PACE/baseline/CrossFuse/evaluation/baseline_epoch_28_test_100`
-- **PACE:** `/home/nvidia/PACE/pace/evaluation/pace_test_100`
-- **Output:** `/home/nvidia/PACE/evaluation/comparisons/test_100`
+## Detection performance
 
-## Overall detection metrics
-
-| Metric | CrossFuse | PACE | PACE − CrossFuse |
+| Metric | CrossFuse | PACE | Difference (PACE − CrossFuse) |
 |---|---:|---:|---:|
-| precision | 0.9655 | 0.9550 | -0.0105 |
-| recall | 0.6750 | 0.7089 | 0.0338 |
-| f1 | 0.7945 | 0.8137 | 0.0192 |
-| map50 | 0.3092 | 0.3015 | -0.0077 |
-| map50_95 | 0.2050 | 0.2009 | -0.0041 |
+| Precision | 0.9655 | 0.9550 | -0.0105 |
+| Recall | 0.6750 | 0.7089 | +0.0338 |
+| F1 | 0.7945 | 0.8137 | +0.0192 |
+| mAP@50 | 0.3092 | 0.3015 | -0.0077 |
+| mAP@50:95 | 0.2050 | 0.2009 | -0.0041 |
 
-## Latency
+Detection metrics above are evaluator-reported **dataset-level point estimates**. No p-values or confidence intervals are assigned to mAP without recomputing mAP over paired bootstrap resamples.
 
-| Stage | CrossFuse mean | PACE mean |
-|---|---:|---:|
-| cross_attention_block_ms | 49.206 | N/A |
-| cuda_peak_allocated_mb | 227.720 | 547.852 |
-| detection_nms_ms | 7.364 | 13.196 |
-| encoder_ms | 5.050 | N/A |
-| encoder_quality_gate_ms | N/A | 37.549 |
-| end_to_end_ms | 68.840 | 60.591 |
-| fps_from_mean_latency | 14.527 | 16.504 |
-| fusion_ms | 56.426 | N/A |
-| selective_fusion_ms | N/A | 9.845 |
+## Latency and memory
 
-## Parameter counts
+Mean paired end-to-end latency difference (PACE − CrossFuse): **-9.500 ms** (n=100).
+Paired percentile bootstrap 95% CI: [-11.376, -7.623] ms.
+Recorded peak GPU memory: CrossFuse 227.7 MB; PACE 547.9 MB. This is **one run-level measurement per model**, not an inferential estimate.
 
-| Component | CrossFuse | PACE |
-|---|---:|---:|
-| detector | 2,590,527 | 2,590,527 |
-| fusion_without_detector | 20,801,123 | N/A |
-| ir_encoder | 1,254,529 | 1,254,529 |
-| ir_quality_estimator | N/A | 94,593 |
-| local_fusion | N/A | 25,900,708 |
-| reliability_gate | N/A | 337 |
-| rgb_encoder | 1,254,529 | 1,254,529 |
-| rgb_quality_estimator | N/A | 94,593 |
-| total | 23,391,650 | N/A |
-| total_including_detector | N/A | 31,189,816 |
+## Figures: provenance, interpretation, and purpose
 
-## Generated charts
+### 1. `01_detection.png`
 
-- `detection_precision.png`
-- `detection_recall.png`
-- `detection_f1.png`
-- `detection_map50.png`
-- `detection_map50_95.png`
-- `detection_overview.png`
-- `per_class_ap.png`
-- `per_class_recall.png`
-- `subset_map50.png`
-- `subset_map50_95.png`
-- `subset_precision.png`
-- `subset_recall.png`
-- `subset_f1.png`
-- `degradation_degradation_type_precision.png`
-- `degradation_degradation_type_recall.png`
-- `degradation_degradation_type_f1.png`
-- `degradation_modality_precision.png`
-- `degradation_modality_recall.png`
-- `degradation_modality_f1.png`
-- `degradation_severity_precision.png`
-- `degradation_severity_recall.png`
-- `degradation_severity_f1.png`
-- `latency_mean.png`
-- `latency_median.png`
-- `latency_p95.png`
-- `latency_distribution.png`
-- `throughput_fps.png`
-- `memory_comparison.png`
-- `parameter_counts.png`
-- `fusion_quality_mean.png`
-- `fusion_quality_median.png`
-- `gate_activity.png`
-- `fused_mean_intensity.png`
-- `fused_max_intensity.png`
-- `sample_prediction_counts.png`
-- `sample_max_confidence.png`
-- `sample_ground_truth_counts.png`
-- `sample_latency_scatter.png`
-- `sample_prediction_scatter.png`
+**Goal:** Compare dataset-level detection accuracy on matched samples.
 
-## Visualization gallery
+**Data source(s):** `baseline/summary.json: detection`, `pace/summary.json: detection`.
 
-- Matched side-by-side panels: 12
-- Matched standalone fused images: 0
-- Contact sheets: 2
-- Pair images: `/home/nvidia/PACE/evaluation/comparisons/test_100/visualization_pairs`
+**How to read / calculation:** Grouped bars show evaluator-reported dataset-level metrics; printed values are point estimates, not confidence intervals.
 
-## Important interpretation notes
+### 2. `02_degradation.png`
 
-- Missing metrics are reported as N/A; they are not treated as zero.
-- A chart is generated only when the corresponding metric exists in at least one run.
-- Per-sample comparisons use the intersection of sample IDs present in both `per_sample.csv` files.
-- Visualization pairs are matched by PNG filename stem. If the two evaluators use different filenames, those samples will not appear in paired galleries.
-- CUDA peak memory is compared only if the evaluation summaries recorded it. This script cannot reconstruct peak GPU memory after the evaluation has finished.
-- Parameter counts are model parameter counts, not runtime memory usage.
-- Latency numbers should only be compared directly when both runs used the same hardware, device, input size, warmup policy, and timing methodology.
+**Goal:** Compare detection performance on clean and degraded images.
+
+**Data source(s):** `baseline/summary.json: subsets`, `pace/summary.json: subsets`.
+
+**How to read / calculation:** Two condition panels with grouped bars for F1 and mAP@50; values are descriptive subset-level estimates.
+
+### 3. `03_latency.png`
+
+**Goal:** Compare per-image latency distributions on matched samples.
+
+**Data source(s):** `baseline/per_sample.csv: sample_id,end_to_end_ms`, `pace/per_sample.csv: sample_id,end_to_end_ms`.
+
+**How to read / calculation:** Boxplots show median, IQR, whiskers and outliers; diamonds mark means. Positive PACE-minus-CrossFuse difference means PACE is slower. Paired bootstrap is reported separately.
+
+### 4. `04_stage_latency.png`
+
+**Goal:** Compare overall stage costs and expose fusion savings versus gate overhead.
+
+**Data source(s):** `baseline/latency.json: encoder_ms,fusion_ms,detection_nms_ms`, `pace/latency.json: encoder_quality_gate_ms,selective_fusion_ms,detection_nms_ms`.
+
+**How to read / calculation:** Stacked mean stage times. The first segment is not functionally identical: PACE includes quality estimation and gating. Stage sums can differ slightly from separately timed end-to-end means.
+
+### 5. `05_memory.png`
+
+**Goal:** Compare observed GPU allocation overhead.
+
+**Data source(s):** `baseline/latency.json: cuda_peak_allocated_mb`, `pace/latency.json: cuda_peak_allocated_mb`.
+
+**How to read / calculation:** Single run-level peak per model; descriptive only, not a sample-level distribution or confidence interval.
+
+### 6. `06_gate_latency.png`
+
+**Goal:** Show how observed runtime varies with the fraction of patches fused.
+
+**Data source(s):** `pace/per_sample.csv: active_fraction,end_to_end_ms`.
+
+**How to read / calculation:** Nonoverlapping gate-activity bins, including a separate zero-activation bin. Bars are per-bin means and labels give sample counts; descriptive only.
+
+### 7. `07_tradeoff.png`
+
+**Goal:** Quantify whether fusion savings compensate for quality estimation and gating.
+
+**Data source(s):** `baseline/latency.json: encoder_ms,fusion_ms`, `pace/latency.json: encoder_quality_gate_ms,selective_fusion_ms`.
+
+**How to read / calculation:** Fusion time saved = CrossFuse fusion mean − PACE fusion mean. Additional encoder/gate cost = PACE encoder-quality-gate mean − CrossFuse encoder mean. Positive overhead offsets positive savings.
+
+### 8. `visualization_pairs/`
+
+**Goal:** Inspect differences in fused imagery and detection overlays for the same images.
+
+**Data source(s):** `baseline/visualizations/<sample_id>.png`, `pace/visualizations/<sample_id>.png`.
+
+**How to read / calculation:** Filename-matched qualitative side-by-side panels; not quantitative evidence of improvement.
+
+## Methodology and limitations
+
+- Both evaluators are run sequentially with identical split, requested image count, confidence, NMS IoU, seed, device selection and warmup arguments. They retain their own existing CLI and output schemas.
+- Exact sample IDs must match across the two runs. A mismatch is an error rather than an invitation to silently compare different subsets.
+- Latency confidence intervals resample **paired images**, preserving correspondence. They quantify sample variability conditional on this device/run, not run-to-run GPU variability.
+- Inference timing may be affected by thermal state, GPU contention, caching and evaluator-specific instrumentation; sequential execution is not randomized.
+- The clean/degraded subset counts and per-subset detection metrics are descriptive; sparse categories should not be interpreted as robust effects.
+- GPU peak memory is measured at run level; a single observation per pipeline cannot support a statistical significance claim.
+- Model parameters and memory are not interchangeable. Memory includes loaded models and temporary allocations.
+- Gate activity is observational; no causal interpretation is warranted.
+
+## Inputs
+
+- CrossFuse: `/home/nvidia/PACE/baseline/CrossFuse/evaluation/baseline_epoch_28_test_100`
+- PACE: `/home/nvidia/PACE/pace/evaluation/pace_test_100`
