@@ -143,8 +143,8 @@ def prepare_sample(encoders, estimators, scales, gate_model, rgb, ir, rgb_origin
     """
     rgb_shallow, rgb_deep = encoders['rgb'](rgb * 255.0)
     ir_shallow, ir_deep = encoders['ir'](ir * 255.0)
-    rgb_quality = predict_quality_from_deep_features(rgb_deep, encoders['rgb'], estimators['rgb'], scales['rgb'])
-    ir_quality = predict_quality_from_deep_features(ir_deep, encoders['ir'], estimators['ir'], scales['ir'])
+    rgb_quality = predict_quality_from_deep_features(rgb_deep, estimators['rgb'], scales['rgb'], rgb)
+    ir_quality = predict_quality_from_deep_features(ir_deep, estimators['ir'], scales['ir'], ir)
     gate = gate_model(rgb_quality, ir_quality)
     encoded_features = (rgb_shallow, rgb_deep, ir_shallow, ir_deep)
     return {'rgb_quality': rgb_quality, 'ir_quality': ir_quality, 'gate': gate, 'encoded_features': encoded_features}

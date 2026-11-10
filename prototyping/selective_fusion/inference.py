@@ -518,18 +518,18 @@ def run_pipeline(
             )
 
         # Native-resolution feature extraction.
-        rgb_q = predict_quality_from_original(
-            encoders["rgb"],
+        rgb_q = predict_quality_from_deep_features(
+            rgb_de,
             estimators["rgb"],
             scales["rgb"],
-            rgb_original,
+            rgb
         )
 
-        ir_q = predict_quality_from_original(
-            encoders["ir"],
+        ir_q = predict_quality_from_deep_features(
+            ir_de,
             estimators["ir"],
             scales["ir"],
-            ir_original,
+            ir
         )
 
     else:
