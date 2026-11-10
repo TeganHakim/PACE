@@ -357,6 +357,21 @@ def predict_quality(
 
 
 @torch.inference_mode()
+def predict_quality_from_deep_features(
+    deep_features,
+    estimator, 
+    scale, 
+    image_01,
+):
+    """Predict quality using precomputed encoder features."""
+    return predict_quality(
+        estimator, 
+        scale, 
+        image_01, 
+        deep_features
+    )
+
+@torch.inference_mode()
 def predict_quality_from_original(
     encoder,
     estimator,

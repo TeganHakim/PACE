@@ -34,7 +34,7 @@ SELECTIVE_ROOT = REPO / 'prototyping' / 'selective_fusion'
 sys.path.insert(0, str(CROSSFUSE_ROOT))
 sys.path.insert(0, str(SELECTIVE_ROOT))
 sys.path.insert(0, str(PACE_ROOT))
-from inference import load_models, load_image, load_quality_image, predict_quality_from_original, samples, choose_device
+from inference import load_models, load_image, load_quality_image, predict_quality_from_deep_features, samples, choose_device
 from local_crossfuse import LocalCrossFuse
 from train_conv_trans import CLASS_TO_ID, ID_TO_CLASS, load_targets, targets_to_metric_format, calculate_metrics
 
@@ -143,8 +143,8 @@ def prepare_sample(encoders, estimators, scales, gate_model, rgb, ir, rgb_origin
     """
     rgb_shallow, rgb_deep = encoders['rgb'](rgb * 255.0)
     ir_shallow, ir_deep = encoders['ir'](ir * 255.0)
-    rgb_quality = predict_quality_from_original(encoders['rgb'], estimators['rgb'], scales['rgb'], rgb_original)
-    ir_quality = predict_quality_from_original(encoders['ir'], estimators['ir'], scales['ir'], ir_original)
+    rgb_quality = predict_quality_from_deep_features(rgb_deep, encoders['rgb'], estimators['rgb'], scales['rgb'])
+    ir_quality = predict_quality_from_deep_features(ir_deep, encoders['ir'], estimators['ir'], scales['ir'])
     gate = gate_model(rgb_quality, ir_quality)
     encoded_features = (rgb_shallow, rgb_deep, ir_shallow, ir_deep)
     return {'rgb_quality': rgb_quality, 'ir_quality': ir_quality, 'gate': gate, 'encoded_features': encoded_features}
