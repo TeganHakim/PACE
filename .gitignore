@@ -238,3 +238,7 @@ prototyping/quality_estimator/features.zip
 pace/evaluation/
 baseline/CrossFuse/evaluation/
 baseline/Addition/evaluation/
+
+# degraded test set 
+processed_dataset_realistic_degraded_v2
+realistic_degraded_test_processed_dataset.zip
