@@ -236,8 +236,11 @@ prototyping/quality_estimator/features.zip
 
 # evaluation results too big to be stored in git
 pace/evaluation/
+pace/visualize_one_image_pace/
 baseline/CrossFuse/evaluation/
 baseline/Addition/evaluation/
+evaluation/results/
+evaluation/comparisons/
 
 # degraded test set 
 processed_dataset_realistic_degraded_v2
