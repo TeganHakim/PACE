@@ -1,0 +1,41 @@
+{
+  "report": "evaluation/comparisons/both_baselines_vs_pace_test_set/comparison_report.md",
+  "exists": true,
+  "sample_count": 8980,
+  "metrics": {
+    "Precision": {
+      "CrossFuse": 0.8745,
+      "PACE": 0.865,
+      "Addition": 0.8753
+    },
+    "Recall": {
+      "CrossFuse": 0.6903,
+      "PACE": 0.6769,
+      "Addition": 0.6526
+    },
+    "F1": {
+      "CrossFuse": 0.7716,
+      "PACE": 0.7595,
+      "Addition": 0.7477
+    },
+    "mAP@50": {
+      "CrossFuse": 0.4712,
+      "PACE": 0.4544,
+      "Addition": 0.4417
+    },
+    "mAP@50:95": {
+      "CrossFuse": 0.2936,
+      "PACE": 0.278,
+      "Addition": 0.2723
+    }
+  },
+  "caveats": [
+    "Reported full-test metrics are prior results, not independently rerun by this audit",
+    "RGB sensor-noise subgroup claim needs its original CSV/figure or fresh condition analysis"
+  ],
+  "expected_metrics_present": true,
+  "pace_beats_addition_on_full_test_map50": true,
+  "crossfuse_beats_pace_on_full_test_map50": true,
+  "condition_analysis_script_exists": true,
+  "condition_specific_rgb_noise_reproduced": false
+}

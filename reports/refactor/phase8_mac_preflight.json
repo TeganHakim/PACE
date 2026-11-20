@@ -1,0 +1,16 @@
+{
+  "platform": "macOS-26.6-arm64-arm-64bit",
+  "machine": "arm64",
+  "python": "3.11.17",
+  "torch": "2.14.1",
+  "cuda_build": null,
+  "cuda_available": false,
+  "mps_available": true,
+  "checkpoints": {
+    "crossfuse": true,
+    "quality_rgb": true,
+    "quality_ir": true,
+    "reliability_gate": true
+  },
+  "errors": []
+}
