@@ -78,6 +78,7 @@ python3 train_autoencoder.py
 - [Architecture and model components](docs/refactor/ARCHITECTURE.md)
 - [Data, training, evaluation and reproducibility](docs/refactor/WORKFLOWS.md)
 - [Mac MPS and Jetson CUDA environment guidance](docs/refactor/ENVIRONMENTS.md)
+- [Jetson validation and full evaluation handoff](docs/refactor/PHASE8_ACCEPTANCE.md#84-jetson-partner-handoff)
 
 The refactor preserves pretrained model behavior; Jetson CUDA compatibility requires validation on the physical device.
 <!-- PACE-REFACTOR-DOCS-END -->
