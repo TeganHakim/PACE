@@ -245,3 +245,7 @@ evaluation/comparisons/
 # degraded test set 
 processed_dataset_realistic_degraded_v2
 realistic_degraded_test_processed_dataset.zip
+
+# Refactor backups and temporary patch bundles
+*.bak
+*.zip
