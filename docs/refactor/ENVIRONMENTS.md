@@ -26,7 +26,17 @@ python -m pytest -q tests/
 python evaluation/eval_metrics.py --dataset-root processed_dataset_realistic_degraded_v2 --original-root VisDrone-DroneVehicle --max-samples 3 --device cuda --visualizations 0 --warmup 2 --seed 42 --output evaluation/results/jetson_smoke
 ```
 
-The preflight checks four required checkpoints and a CUDA tensor smoke operation; it **does not** establish full pipeline compatibility. Evaluate all three methods, inspect model loading and numerical results, then run the full dataset. Measure Jetson latency/FPS and memory separately from Mac timings.
+After configuring the Jetson environment, follow the complete
+[Phase 8 Jetson Partner Handoff](PHASE8_ACCEPTANCE.md#84-jetson-partner-handoff).
+
+The validation proceeds in three stages:
+
+1. CUDA compatibility, automated tests, and three-sample smoke test
+2. Full-dataset evaluation with updated metrics and figures
+3. Condition-specific analysis of PACE versus the baselines
+
+The smoke test alone does not establish full pipeline performance.
+Record Jetson latency, throughput, and memory separately from Mac results.
 
 ## Common problems
 
