@@ -112,8 +112,6 @@ PACE/
 │   └── phase8_jetson_handoff.py
 │
 ├── docs/                             # Technical documentation
-│   ├── phase3_migration.md
-│   ├── PHASE6_EXPERIMENTS.md
 │   └── refactor/
 │       ├── ARCHITECTURE.md
 │       ├── WORKFLOWS.md
@@ -504,8 +502,6 @@ It does not establish that all historical full-dataset results have been indepen
 | `docs/refactor/WORKFLOWS.md` | Dataset, training, and evaluation workflows |
 | `docs/refactor/ENVIRONMENTS.md` | Environment setup and dependencies |
 | `docs/refactor/PHASE8_ACCEPTANCE.md` | Final validation and Jetson handoff |
-| `docs/PHASE6_EXPERIMENTS.md` | Experiment inventory and research preservation |
-| `docs/phase3_migration.md` | Data-module migration notes |
 | `evaluation/README_EVALUATION.md` | Evaluation documentation |
 | `evaluation/READ_CONDITION_ANALYSIS.md` | Condition-analysis workflow |
 
