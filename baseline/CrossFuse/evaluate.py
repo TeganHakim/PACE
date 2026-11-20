@@ -57,6 +57,7 @@ def arguments():
     p.add_argument('--no-fusion-metrics', action='store_true')
     p.add_argument('--no-latency', action='store_true')
     p.add_argument('--seed', type=int, default=42)
+    p.add_argument('--save-fused', action='store_true')
     return p.parse_args()
 
 
@@ -348,6 +349,10 @@ def main():
                        'num_ground_truth': len(targets),
                        'num_predictions_at_confidence': sum(float(v)>=a.confidence for v in pred['scores']),
                        **fm, **({} if a.no_latency else duration)}
+                if a.save_fused:
+                    (out/'fused').mkdir(parents=True, exist_ok=True)
+                    if not cv2.imwrite(str(out/'fused'/f'{sample_id}.png'), fused_numpy(output['out'])):
+                        raise IOError(f'Failed to save CrossFuse fused image {sample_id}')
                 rows.append(row)
                 predictions_json.append({'sample_id':sample_id, 'predictions':prediction_records(pred),
                                          'ground_truth':[{'class_id':int(c), 'cx':float(cx), 'cy':float(cy),

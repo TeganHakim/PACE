@@ -1,0 +1,967 @@
+{
+  "purpose": "Pre-refactor training provenance; no scripts executed or modified",
+  "scripts": [
+    {
+      "path": "prototyping/quality_estimator/train.py",
+      "sha256": "200c7df1002ffc2dc5094766a94417ce7551ee5d057bf142447b129f1341ff30",
+      "lines": 629,
+      "imports": [
+        "argparse",
+        "cv2",
+        "degradation_features",
+        "encoder",
+        "model",
+        "numpy",
+        "pathlib",
+        "random",
+        "sys",
+        "torch",
+        "torch.nn.functional",
+        "torch.utils.data"
+      ],
+      "functions": [
+        {
+          "name": "__init__",
+          "line": 107
+        },
+        {
+          "name": "__len__",
+          "line": 155
+        },
+        {
+          "name": "__getitem__",
+          "line": 158
+        },
+        {
+          "name": "extract_quality_features",
+          "line": 192
+        },
+        {
+          "name": "get_device",
+          "line": 231
+        },
+        {
+          "name": "set_seed",
+          "line": 239
+        },
+        {
+          "name": "weighted_mse",
+          "line": 248
+        },
+        {
+          "name": "create_balanced_sampler",
+          "line": 261
+        },
+        {
+          "name": "run_epoch",
+          "line": 304
+        },
+        {
+          "name": "train_modality",
+          "line": 427
+        },
+        {
+          "name": "main",
+          "line": 584
+        }
+      ],
+      "configuration_assignments": [
+        {
+          "name": "DATASET_ROOT",
+          "line": 57,
+          "expression": "REPO_ROOT / \"processed_dataset\""
+        },
+        {
+          "name": "CHECKPOINT_ROOT",
+          "line": 58,
+          "expression": "QUALITY_ROOT / \"checkpoints\""
+        },
+        {
+          "name": "EPOCHS",
+          "line": 67,
+          "expression": "30"
+        },
+        {
+          "name": "BATCH_SIZE",
+          "line": 68,
+          "expression": "8"
+        },
+        {
+          "name": "LEARNING_RATE",
+          "line": 69,
+          "expression": "3e-4"
+        },
+        {
+          "name": "MIN_LEARNING_RATE",
+          "line": 70,
+          "expression": "1e-6"
+        },
+        {
+          "name": "LR_PATIENCE",
+          "line": 71,
+          "expression": "3"
+        },
+        {
+          "name": "LR_FACTOR",
+          "line": 72,
+          "expression": "0.5"
+        },
+        {
+          "name": "RANDOM_SEED",
+          "line": 74,
+          "expression": "42"
+        },
+        {
+          "name": "LOSS_WEIGHT_STRENGTH",
+          "line": 76,
+          "expression": "4.0"
+        },
+        {
+          "name": "DEGRADED_THRESHOLD",
+          "line": 77,
+          "expression": "0.8"
+        },
+        {
+          "name": "weights",
+          "line": 249,
+          "expression": "1.0 + LOSS_WEIGHT_STRENGTH * (1.0 - targets)"
+        },
+        {
+          "name": "weights",
+          "line": 277,
+          "expression": "np.ones(\n            len(dataset), dtype=np.float64\n        )"
+        },
+        {
+          "name": "weights",
+          "line": 281,
+          "expression": "np.where(\n            degraded,\n            DEGRADED_SAMPLE_FRACTION / n_degraded,\n            (1.0 - DEGRADED_SAMPLE_FRACTION) / n_clean,\n        )"
+        },
+        {
+          "name": "total_weighted_error",
+          "line": 315,
+          "expression": "0.0"
+        },
+        {
+          "name": "total_weight",
+          "line": 316,
+          "expression": "0.0"
+        },
+        {
+          "name": "loss",
+          "line": 349,
+          "expression": "weighted_mse(predictions, targets)"
+        },
+        {
+          "name": "weights",
+          "line": 357,
+          "expression": "1.0\n                    + LOSS_WEIGHT_STRENGTH\n                    * (1.0 - targets)"
+        },
+        {
+          "name": "train_dataset",
+          "line": 432,
+          "expression": "QualityImageDataset(\n        modality,\n        \"train\",\n        MAX_TRAIN_SAMPLES,\n    )"
+        },
+        {
+          "name": "val_dataset",
+          "line": 437,
+          "expression": "QualityImageDataset(\n        modality,\n        \"val\",\n        MAX_VAL_SAMPLES,\n    )"
+        },
+        {
+          "name": "optimizer",
+          "line": 481,
+          "expression": "torch.optim.Adam(\n        model.parameters(),\n        lr=LEARNING_RATE,\n    )"
+        },
+        {
+          "name": "scheduler",
+          "line": 486,
+          "expression": "torch.optim.lr_scheduler.ReduceLROnPlateau(\n        optimizer,\n        mode=\"min\",\n        factor=LR_FACTOR,\n        patience=LR_PATIENCE,\n        min_lr=MIN_LEARNING_RATE,\n    )"
+        },
+        {
+          "name": "checkpoint_path",
+          "line": 499,
+          "expression": "CHECKPOINT_ROOT / f\"quality_{modality}.pt\""
+        },
+        {
+          "name": "best_val_loss",
+          "line": 503,
+          "expression": "float(\"inf\")"
+        },
+        {
+          "name": "current_lr",
+          "line": 530,
+          "expression": "optimizer.param_groups[0][\"lr\"]"
+        },
+        {
+          "name": "best_val_loss",
+          "line": 547,
+          "expression": "val_metrics[\"mse\"]"
+        },
+        {
+          "name": "EPOCHS",
+          "line": 615,
+          "expression": "args.epochs"
+        }
+      ],
+      "training_calls": [
+        {
+          "call": "np.load",
+          "line": 134
+        },
+        {
+          "call": "torch.from_numpy(np.load(label_path).astype(np.float32)).unsqueeze",
+          "line": 181
+        },
+        {
+          "call": "np.load(label_path).astype",
+          "line": 182
+        },
+        {
+          "call": "np.load",
+          "line": 182
+        },
+        {
+          "call": "random.seed",
+          "line": 240
+        },
+        {
+          "call": "np.random.seed",
+          "line": 241
+        },
+        {
+          "call": "torch.manual_seed",
+          "line": 242
+        },
+        {
+          "call": "torch.cuda.manual_seed_all",
+          "line": 245
+        },
+        {
+          "call": "generator.manual_seed",
+          "line": 288
+        },
+        {
+          "call": "optimizer.zero_grad",
+          "line": 352
+        },
+        {
+          "call": "loss.backward",
+          "line": 353
+        },
+        {
+          "call": "optimizer.step",
+          "line": 354
+        },
+        {
+          "call": "DataLoader",
+          "line": 445
+        },
+        {
+          "call": "DataLoader",
+          "line": 452
+        },
+        {
+          "call": "load_encoder",
+          "line": 460
+        },
+        {
+          "call": "torch.optim.Adam",
+          "line": 481
+        },
+        {
+          "call": "torch.optim.lr_scheduler.ReduceLROnPlateau",
+          "line": 486
+        },
+        {
+          "call": "CHECKPOINT_ROOT.mkdir",
+          "line": 494
+        },
+        {
+          "call": "scheduler.step",
+          "line": 528
+        },
+        {
+          "call": "torch.save",
+          "line": 549
+        },
+        {
+          "call": "argparse.ArgumentParser",
+          "line": 586
+        },
+        {
+          "call": "set_seed",
+          "line": 617
+        }
+      ]
+    },
+    {
+      "path": "prototyping/reliability_gate/train.py",
+      "sha256": "556d932291cd701dcc1ab6e5b905a671d5e2a149ae8c83b722684222dc4951ef",
+      "lines": 291,
+      "imports": [
+        "argparse",
+        "cv2",
+        "degradation_features",
+        "encoder",
+        "model",
+        "network.net_conv_trans",
+        "numpy",
+        "pathlib",
+        "random",
+        "reliability_gate",
+        "sys",
+        "torch",
+        "torch.nn.functional",
+        "torch.utils.data"
+      ],
+      "functions": [
+        {
+          "name": "device_default",
+          "line": 53
+        },
+        {
+          "name": "checkpoint_state",
+          "line": 61
+        },
+        {
+          "name": "load_frozen_models",
+          "line": 70
+        },
+        {
+          "name": "list_samples",
+          "line": 91
+        },
+        {
+          "name": "read_grayscale",
+          "line": 113
+        },
+        {
+          "name": "read_quality",
+          "line": 122
+        },
+        {
+          "name": "generate_labels",
+          "line": 131
+        },
+        {
+          "name": "load_cache",
+          "line": 183
+        },
+        {
+          "name": "train_gate",
+          "line": 191
+        },
+        {
+          "name": "main",
+          "line": 254
+        }
+      ],
+      "configuration_assignments": [
+        {
+          "name": "OUTPUT_ROOT",
+          "line": 50,
+          "expression": "ROOT / \"prototyping\" / \"reliability_gate\" / \"checkpoints\""
+        },
+        {
+          "name": "pos_weight",
+          "line": 202,
+          "expression": "min((count - positives) / max(positives, 1.0), 20.0)"
+        },
+        {
+          "name": "optimizer",
+          "line": 205,
+          "expression": "torch.optim.Adam(gate.parameters(), lr=lr)"
+        },
+        {
+          "name": "loss",
+          "line": 220,
+          "expression": "F.binary_cross_entropy_with_logits(\n                        logits, target,\n                        pos_weight=torch.tensor(pos_weight, device=device),\n                    )"
+        }
+      ],
+      "training_calls": [
+        {
+          "call": "torch.load",
+          "line": 64
+        },
+        {
+          "call": "load_encoder",
+          "line": 71
+        },
+        {
+          "call": "load_encoder",
+          "line": 72
+        },
+        {
+          "call": "checkpoint_state",
+          "line": 75
+        },
+        {
+          "call": "transfuse.load_state_dict",
+          "line": 76
+        },
+        {
+          "call": "checkpoint_state",
+          "line": 79
+        },
+        {
+          "call": "quality_estimator.load_state_dict",
+          "line": 83
+        },
+        {
+          "call": "np.load(path).astype",
+          "line": 123
+        },
+        {
+          "call": "np.load",
+          "line": 123
+        },
+        {
+          "call": "load_frozen_models",
+          "line": 140
+        },
+        {
+          "call": "torch.save",
+          "line": 177
+        },
+        {
+          "call": "torch.load",
+          "line": 184
+        },
+        {
+          "call": "load_cache",
+          "line": 192
+        },
+        {
+          "call": "load_cache",
+          "line": 193
+        },
+        {
+          "call": "DataLoader",
+          "line": 194
+        },
+        {
+          "call": "DataLoader",
+          "line": 195
+        },
+        {
+          "call": "torch.optim.Adam",
+          "line": 205
+        },
+        {
+          "call": "optimizer.zero_grad",
+          "line": 225
+        },
+        {
+          "call": "loss.backward",
+          "line": 226
+        },
+        {
+          "call": "optimizer.step",
+          "line": 227
+        },
+        {
+          "call": "loss.detach",
+          "line": 228
+        },
+        {
+          "call": "torch.save",
+          "line": 238
+        },
+        {
+          "call": "argparse.ArgumentParser",
+          "line": 255
+        },
+        {
+          "call": "random.seed",
+          "line": 267
+        },
+        {
+          "call": "np.random.seed",
+          "line": 268
+        },
+        {
+          "call": "torch.manual_seed",
+          "line": 269
+        }
+      ]
+    },
+    {
+      "path": "baseline/CrossFuse/train_autoencoder.py",
+      "sha256": "de63a734b4d6795b8a50323adddfe0e715c873a5a11cb4c1cdb42f4a72f7bbeb",
+      "lines": 230,
+      "imports": [
+        "args_auto",
+        "network.net_autoencoder",
+        "os",
+        "random",
+        "scipy.io",
+        "time",
+        "tools",
+        "torch",
+        "torch.autograd",
+        "torch.optim",
+        "tqdm"
+      ],
+      "functions": [
+        {
+          "name": "load_data",
+          "line": 42
+        },
+        {
+          "name": "train",
+          "line": 50
+        }
+      ],
+      "configuration_assignments": [
+        {
+          "name": "batch_size",
+          "line": 51,
+          "expression": "args.batch"
+        },
+        {
+          "name": "optimizer",
+          "line": 71,
+          "expression": "Adam(trainable_params, args.lr, weight_decay=0.1)"
+        },
+        {
+          "name": "temp_path_loss",
+          "line": 85,
+          "expression": "os.path.join(temp_path_model, 'loss')"
+        },
+        {
+          "name": "loss_p4",
+          "line": 89,
+          "expression": "0."
+        },
+        {
+          "name": "loss_p5",
+          "line": 90,
+          "expression": "0."
+        },
+        {
+          "name": "loss_all",
+          "line": 91,
+          "expression": "0."
+        },
+        {
+          "name": "loss_mat",
+          "line": 93,
+          "expression": "[]"
+        },
+        {
+          "name": "lr_cur",
+          "line": 97,
+          "expression": "utils.adjust_learning_rate(optimizer, e, args.lr)"
+        },
+        {
+          "name": "batch",
+          "line": 111,
+          "expression": "Variable(img, requires_grad=False).to(device)"
+        },
+        {
+          "name": "outputs",
+          "line": 114,
+          "expression": "model.train_module(batch)"
+        },
+        {
+          "name": "total_loss",
+          "line": 116,
+          "expression": "outputs['total_loss']"
+        },
+        {
+          "name": "loss_p4",
+          "line": 162,
+          "expression": "0."
+        },
+        {
+          "name": "loss_p5",
+          "line": 163,
+          "expression": "0."
+        },
+        {
+          "name": "loss_all",
+          "line": 164,
+          "expression": "0."
+        },
+        {
+          "name": "loss_filename_path",
+          "line": 174,
+          "expression": "os.path.join(temp_path_loss, save_model_filename)"
+        }
+      ],
+      "training_calls": [
+        {
+          "call": "model.load_state_dict",
+          "line": 67
+        },
+        {
+          "call": "torch.load",
+          "line": 67
+        },
+        {
+          "call": "utils.load_dataset",
+          "line": 98
+        },
+        {
+          "call": "optimizer.zero_grad",
+          "line": 110
+        },
+        {
+          "call": "loss_mat.append",
+          "line": 117
+        },
+        {
+          "call": "total_loss.item",
+          "line": 117
+        },
+        {
+          "call": "total_loss.backward",
+          "line": 118
+        },
+        {
+          "call": "optimizer.step",
+          "line": 119
+        },
+        {
+          "call": "'{} - Epoch {}/{} - Batch {}/{} - lr:{:.6f} - recon loss: {:.6f} - ssim loss: {:.6f} - total loss: {:.6f} \\n'.format",
+          "line": 138
+        },
+        {
+          "call": "total_loss.item",
+          "line": 165
+        },
+        {
+          "call": "scio.savemat",
+          "line": 175
+        },
+        {
+          "call": "torch.save",
+          "line": 181
+        },
+        {
+          "call": "load_data",
+          "line": 228
+        }
+      ]
+    },
+    {
+      "path": "baseline/CrossFuse/train_conv_trans.py",
+      "sha256": "fdf175f0d2948cd4051a986c844a30308acb602918df81532f29d57afe3ff2b6",
+      "lines": 723,
+      "imports": [
+        "args_trans",
+        "network.loss",
+        "network.net_autoencoder",
+        "network.net_conv_trans",
+        "os",
+        "random",
+        "scipy.io",
+        "tools",
+        "torch",
+        "torch.optim",
+        "torchmetrics.detection",
+        "tqdm",
+        "types",
+        "ultralytics.utils.nms",
+        "xml.etree.ElementTree"
+      ],
+      "functions": [
+        {
+          "name": "get_annotation_path",
+          "line": 76
+        },
+        {
+          "name": "load_xml_boxes",
+          "line": 92
+        },
+        {
+          "name": "calculate_iou",
+          "line": 132
+        },
+        {
+          "name": "merge_rgb_ir_boxes",
+          "line": 149
+        },
+        {
+          "name": "load_targets",
+          "line": 187
+        },
+        {
+          "name": "make_yolo_batch",
+          "line": 220
+        },
+        {
+          "name": "targets_to_metric_format",
+          "line": 245
+        },
+        {
+          "name": "decode_predictions",
+          "line": 274
+        },
+        {
+          "name": "load_split",
+          "line": 308
+        },
+        {
+          "name": "get_rgb_paths",
+          "line": 316
+        },
+        {
+          "name": "load_batch_targets",
+          "line": 323
+        },
+        {
+          "name": "calculate_metrics",
+          "line": 336
+        },
+        {
+          "name": "run_epoch",
+          "line": 416
+        },
+        {
+          "name": "train",
+          "line": 602
+        }
+      ],
+      "configuration_assignments": [
+        {
+          "name": "batches_seen",
+          "line": 441,
+          "expression": "0"
+        },
+        {
+          "name": "total_loss_sum",
+          "line": 442,
+          "expression": "0.0"
+        },
+        {
+          "name": "det_loss_sum",
+          "line": 443,
+          "expression": "0.0"
+        },
+        {
+          "name": "fusion_loss_sum",
+          "line": 444,
+          "expression": "0.0"
+        },
+        {
+          "name": "metric_batches",
+          "line": 449,
+          "expression": "set(range(batch_count)) if split == \"val\"\n        else set(range(0, batch_count, max(1, metric_every)))"
+        },
+        {
+          "name": "outputs",
+          "line": 502,
+          "expression": "model.train_module(\n                images_ir,\n                images_rgb,\n                ir_sh,\n                rgb_sh,\n                ir_de,\n                rgb_de,\n                False,\n                gra_loss,\n                order_loss,\n            )"
+        },
+        {
+          "name": "outputs",
+          "line": 515,
+          "expression": "model.train_module(\n                    images_ir,\n                    images_rgb,\n                    ir_sh,\n                    rgb_sh,\n                    ir_de,\n                    rgb_de,\n                    False,\n                    gra_loss,\n                    order_loss,\n                )"
+        },
+        {
+          "name": "yolo_batch",
+          "line": 528,
+          "expression": "make_yolo_batch(targets, fused)"
+        },
+        {
+          "name": "det_loss_value",
+          "line": 534,
+          "expression": "det_loss.sum()"
+        },
+        {
+          "name": "fusion_loss_value",
+          "line": 535,
+          "expression": "outputs[\"total_loss\"]"
+        },
+        {
+          "name": "loss",
+          "line": 536,
+          "expression": "det_loss_value + fusion_loss_value"
+        },
+        {
+          "name": "det_loss_value",
+          "line": 542,
+          "expression": "det_loss.sum()"
+        },
+        {
+          "name": "fusion_loss_value",
+          "line": 543,
+          "expression": "outputs[\"total_loss\"]"
+        },
+        {
+          "name": "loss",
+          "line": 544,
+          "expression": "det_loss_value + fusion_loss_value"
+        },
+        {
+          "name": "loss_value",
+          "line": 546,
+          "expression": "float(loss.detach().item())"
+        },
+        {
+          "name": "mean_total_loss",
+          "line": 566,
+          "expression": "total_loss_sum / max(batches_seen, 1)"
+        },
+        {
+          "name": "mean_det_loss",
+          "line": 567,
+          "expression": "det_loss_sum / max(batches_seen, 1)"
+        },
+        {
+          "name": "mean_fusion_loss",
+          "line": 568,
+          "expression": "fusion_loss_sum / max(batches_seen, 1)"
+        },
+        {
+          "name": "gra_loss",
+          "line": 633,
+          "expression": "Gradient_loss(custom_config[\"out_channels\"]).to(device)"
+        },
+        {
+          "name": "order_loss",
+          "line": 634,
+          "expression": "Order_loss(custom_config[\"out_channels\"]).to(device)"
+        },
+        {
+          "name": "optimizer",
+          "line": 636,
+          "expression": "Adam(\n        (p for p in model.parameters() if p.requires_grad),\n        lr=args.lr,\n        weight_decay=0.0005,\n    )"
+        },
+        {
+          "name": "output_root",
+          "line": 656,
+          "expression": "args.save_fusion_model"
+        },
+        {
+          "name": "loss_dir",
+          "line": 658,
+          "expression": "os.path.join(model_dir, \"loss\")"
+        },
+        {
+          "name": "checkpoint",
+          "line": 711,
+          "expression": "os.path.join(\n            model_dir, f\"fusetrans_epoch_{epoch + 1}.model\"\n        )"
+        }
+      ],
+      "training_calls": [
+        {
+          "call": "load_xml_boxes",
+          "line": 192
+        },
+        {
+          "call": "load_xml_boxes",
+          "line": 194
+        },
+        {
+          "call": "load_targets",
+          "line": 327
+        },
+        {
+          "call": "utils.load_dataset",
+          "line": 437
+        },
+        {
+          "call": "load_batch_targets",
+          "line": 495
+        },
+        {
+          "call": "optimizer.zero_grad",
+          "line": 531
+        },
+        {
+          "call": "det_loss.sum",
+          "line": 534
+        },
+        {
+          "call": "loss.backward",
+          "line": 537
+        },
+        {
+          "call": "optimizer.step",
+          "line": 538
+        },
+        {
+          "call": "det_loss.sum",
+          "line": 542
+        },
+        {
+          "call": "loss.detach().item",
+          "line": 546
+        },
+        {
+          "call": "loss.detach",
+          "line": 546
+        },
+        {
+          "call": "loss.item",
+          "line": 561
+        },
+        {
+          "call": "det_loss_value.item",
+          "line": 562
+        },
+        {
+          "call": "fusion_loss_value.item",
+          "line": 563
+        },
+        {
+          "call": "model.load_state_dict",
+          "line": 617
+        },
+        {
+          "call": "torch.load",
+          "line": 618
+        },
+        {
+          "call": "model_auto_ir.load_state_dict",
+          "line": 622
+        },
+        {
+          "call": "torch.load",
+          "line": 623
+        },
+        {
+          "call": "model_auto_rgb.load_state_dict",
+          "line": 626
+        },
+        {
+          "call": "torch.load",
+          "line": 627
+        },
+        {
+          "call": "Gradient_loss(custom_config['out_channels']).to",
+          "line": 633
+        },
+        {
+          "call": "Gradient_loss",
+          "line": 633
+        },
+        {
+          "call": "Order_loss(custom_config['out_channels']).to",
+          "line": 634
+        },
+        {
+          "call": "Order_loss",
+          "line": 634
+        },
+        {
+          "call": "load_split",
+          "line": 645
+        },
+        {
+          "call": "load_split",
+          "line": 646
+        },
+        {
+          "call": "scio.savemat",
+          "line": 703
+        },
+        {
+          "call": "torch.save",
+          "line": 714
+        }
+      ]
+    }
+  ]
+}

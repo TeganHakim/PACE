@@ -1,0 +1,93 @@
+{
+  "scripts": {
+    "quality_estimator": {
+      "path": "prototyping/quality_estimator/train.py",
+      "sha256": "200c7df1002ffc2dc5094766a94417ce7551ee5d057bf142447b129f1341ff30",
+      "checkpoint_fields": [
+        "degraded_sample_fraction",
+        "epoch",
+        "extra_feature_scale",
+        "in_channels",
+        "learning_rate",
+        "loss_weight_strength",
+        "modality",
+        "model_state_dict",
+        "val_degraded_mae",
+        "val_mae",
+        "val_mse"
+      ]
+    },
+    "reliability_gate": {
+      "path": "prototyping/reliability_gate/train.py",
+      "sha256": "556d932291cd701dcc1ab6e5b905a671d5e2a149ae8c83b722684222dc4951ef",
+      "checkpoint_fields": [
+        "epoch",
+        "fused_image_scorer",
+        "hidden_dim",
+        "model_state_dict",
+        "positive_fraction",
+        "seed",
+        "training_method",
+        "val_accuracy",
+        "val_bce"
+      ]
+    }
+  },
+  "pretrained_checkpoints": {
+    "quality_rgb": {
+      "path": "prototyping/quality_estimator/checkpoints/quality_rgb.pt",
+      "sha256": "241e58774cc5f2a6395c25f1315cebdf97bdae4a02dd92fee40abe63e8753073",
+      "checkpoint_fields": [
+        "degraded_sample_fraction",
+        "epoch",
+        "extra_feature_scale",
+        "in_channels",
+        "learning_rate",
+        "loss_weight_strength",
+        "modality",
+        "model_state_dict",
+        "val_degraded_mae",
+        "val_mae",
+        "val_mse"
+      ],
+      "missing_training_metadata": [],
+      "state_dict_tensors": 6
+    },
+    "quality_ir": {
+      "path": "prototyping/quality_estimator/checkpoints/quality_ir.pt",
+      "sha256": "4d9e3c3cd4e275be2cf62cbb663ac40d6cae6bf964d1614d50b2cee4b12842b1",
+      "checkpoint_fields": [
+        "degraded_sample_fraction",
+        "epoch",
+        "extra_feature_scale",
+        "in_channels",
+        "learning_rate",
+        "loss_weight_strength",
+        "modality",
+        "model_state_dict",
+        "val_degraded_mae",
+        "val_mae",
+        "val_mse"
+      ],
+      "missing_training_metadata": [],
+      "state_dict_tensors": 6
+    },
+    "reliability_gate": {
+      "path": "prototyping/reliability_gate/checkpoints/reliability_gate_best.pt",
+      "sha256": "bd0f6258d6daabd2994b26475d7266a37387ceb1c5d675f8085311ea9eaae2cd",
+      "checkpoint_fields": [
+        "epoch",
+        "fused_image_scorer",
+        "hidden_dim",
+        "model_state_dict",
+        "positive_fraction",
+        "seed",
+        "training_method",
+        "val_accuracy",
+        "val_bce"
+      ],
+      "missing_training_metadata": [],
+      "state_dict_tensors": 6
+    }
+  }
+}

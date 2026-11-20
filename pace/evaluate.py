@@ -58,6 +58,8 @@ def arguments():
     parser.add_argument('--no-latency', action='store_true')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--detector-weights', type=Path, default=CROSSFUSE_ROOT / 'models' / 'transfuse' / 'fusetrans_epoch_28.model')
+    parser.add_argument('--paired-jpg-samples', action='store_true')
+    parser.add_argument('--save-fused', action='store_true')
     return parser.parse_args()
 
 
@@ -585,6 +587,10 @@ def evaluate_samples(args, device, sample_list, metadata, visualization_dir, enc
                 **fusion_report,
                 **({} if args.no_latency else duration),
             }
+            if args.save_fused:
+                (visualization_dir.parent / 'fused').mkdir(parents=True, exist_ok=True)
+                if not cv2.imwrite(str(visualization_dir.parent / 'fused' / f'{sample_id}.png'), fused_image):
+                    raise IOError(f'Failed to save PACE fused image {sample_id}')
             rows.append(row)
             predictions_json.append({
                 "sample_id": sample_id,
@@ -912,7 +918,19 @@ def main():
     visualization_dir = output_dir / 'visualizations'
     if args.visualizations:
         visualization_dir.mkdir(parents=True, exist_ok=True)
-    sample_list = load_samples(args.split, args.max_samples)
+    if args.paired_jpg_samples:
+        sample_list = []
+        root = args.dataset_root / args.split
+        for ir_path in sorted((root / 'ir').glob('*.jpg')):
+            rgb_path = root / 'rgb' / ir_path.name
+            if rgb_path.is_file():
+                sample_list.append((ir_path.stem, rgb_path, ir_path, None, None))
+                if args.max_samples and len(sample_list) >= args.max_samples:
+                    break
+        if not sample_list:
+            raise RuntimeError('No RGB/IR JPG pairs in ' + str(root))
+    else:
+        sample_list = load_samples(args.split, args.max_samples)
     metadata = read_metadata(args.dataset_root / 'metadata.csv')
     print(f'Device: {device}; split: {args.split}; samples: {len(sample_list)}; output: {output_dir}')
     encoders, estimators, scales, gate_model, local_model, detector = load_evaluation_models(args, device)
