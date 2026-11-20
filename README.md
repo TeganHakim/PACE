@@ -71,3 +71,13 @@ Run the following commands each with different `type_flag` values in `baseline/C
 cd baseline/CrossFuse
 python3 train_autoencoder.py
 ```
+
+<!-- PACE-REFACTOR-DOCS-START -->
+## Refactor documentation
+
+- [Architecture and model components](docs/refactor/ARCHITECTURE.md)
+- [Data, training, evaluation and reproducibility](docs/refactor/WORKFLOWS.md)
+- [Mac MPS and Jetson CUDA environment guidance](docs/refactor/ENVIRONMENTS.md)
+
+The refactor preserves pretrained model behavior; Jetson CUDA compatibility requires validation on the physical device.
+<!-- PACE-REFACTOR-DOCS-END -->
