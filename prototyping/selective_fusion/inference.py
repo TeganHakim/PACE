@@ -20,6 +20,11 @@ import torch.nn.functional as F
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+# Allow pace.* imports when inference.py is loaded by standalone scripts.
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 CF = ROOT / "baseline" / "CrossFuse"
 
 for folder in (
@@ -31,11 +36,9 @@ for folder in (
     sys.path.insert(0, str(folder))
 
 from encoder import load_encoder, extract_features
-from model import SpatialQualityEstimator
+from pace.models import SpatialQualityEstimator, ReliabilityGate, LocalCrossFuse
 from degradation_features import degradation_features
-from reliability_gate import ReliabilityGate
 from network.net_conv_trans import Trans_FuseNet
-from local_crossfuse import LocalCrossFuse
 
 
 FUSION_CONFIG = dict(
