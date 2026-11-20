@@ -32,7 +32,19 @@ from degradation import generate_mask, apply_degradation
 
 from lighting import compute_rgb_baseline_quality
 
-from quality_labels import create_ir_baseline, mask_to_coverage, compute_final_quality
+# Allow direct execution: python prototyping/synthetic_data_degradation/build_dataset.py
+# while importing the canonical implementation from the repository package.
+import sys
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from pace.data.quality_labels import (
+    create_ir_baseline,
+    mask_to_coverage,
+    compute_final_quality,
+)
 
 # ------------------------------------------------------------------
 # Configuration
