@@ -1,0 +1,83 @@
+{
+  "artifacts": {
+    "checkpoints": {
+      "crossfuse": {
+        "exists": true,
+        "path": "baseline/CrossFuse/models/transfuse/fusetrans_epoch_28.model",
+        "sha256": "fe1492cef428810c1f9fb45c513eafed61176b5800181e577dc82e6a892b2442",
+        "size_bytes": 93878274
+      },
+      "gate": {
+        "exists": true,
+        "path": "prototyping/reliability_gate/checkpoints/reliability_gate_best.pt",
+        "sha256": "bd0f6258d6daabd2994b26475d7266a37387ceb1c5d675f8085311ea9eaae2cd",
+        "size_bytes": 5053
+      },
+      "quality_ir": {
+        "exists": true,
+        "path": "prototyping/quality_estimator/checkpoints/quality_ir.pt",
+        "sha256": "4d9e3c3cd4e275be2cf62cbb663ac40d6cae6bf964d1614d50b2cee4b12842b1",
+        "size_bytes": 381945
+      },
+      "quality_rgb": {
+        "exists": true,
+        "path": "prototyping/quality_estimator/checkpoints/quality_rgb.pt",
+        "sha256": "241e58774cc5f2a6395c25f1315cebdf97bdae4a02dd92fee40abe63e8753073",
+        "size_bytes": 381957
+      }
+    },
+    "reports": {
+      "full_test": {
+        "exists": true,
+        "path": "evaluation/comparisons/both_baselines_vs_pace_test_set/comparison_report.md",
+        "sha256": "544cf71ece1589c9fdc01e85f5a99d895c55a40e365e57fe03132b987dc8fc60",
+        "size_bytes": 1129
+      },
+      "training_contract": {
+        "exists": true,
+        "path": "reports/refactor/phase4_training_contract.json",
+        "sha256": "1ae3b8f9bb475d4c2600470f9be4120eb32e9c1c19aef5584f0e9f2d2564d9c3",
+        "size_bytes": 2620
+      }
+    },
+    "sources": {
+      "condition_analysis": {
+        "exists": true,
+        "path": "evaluation/condition_analysis.py",
+        "sha256": "cce3e6bb72e0479db7c8b1bf92d0459d43405c189788176b56d721c261a7ebd2",
+        "size_bytes": 21511
+      },
+      "crossfuse_autoencoder": {
+        "exists": true,
+        "path": "baseline/CrossFuse/train_autoencoder.py",
+        "sha256": "de63a734b4d6795b8a50323adddfe0e715c873a5a11cb4c1cdb42f4a72f7bbeb",
+        "size_bytes": 7653
+      },
+      "crossfuse_transformer": {
+        "exists": true,
+        "path": "baseline/CrossFuse/train_conv_trans.py",
+        "sha256": "fdf175f0d2948cd4051a986c844a30308acb602918df81532f29d57afe3ff2b6",
+        "size_bytes": 21216
+      },
+      "evaluation": {
+        "exists": true,
+        "path": "evaluation/eval_metrics.py",
+        "sha256": "948fb55602d817fb0096605c46090ad94785d63954354e9415ef74f3dcaf876e",
+        "size_bytes": 13290
+      },
+      "gate_train": {
+        "exists": true,
+        "path": "prototyping/reliability_gate/train.py",
+        "sha256": "556d932291cd701dcc1ab6e5b905a671d5e2a149ae8c83b722684222dc4951ef",
+        "size_bytes": 12740
+      },
+      "quality_train": {
+        "exists": true,
+        "path": "prototyping/quality_estimator/train.py",
+        "sha256": "200c7df1002ffc2dc5094766a94417ce7551ee5d057bf142447b129f1341ff30",
+        "size_bytes": 16019
+      }
+    }
+  },
+  "schema_version": 1
+}

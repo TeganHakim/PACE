@@ -1,0 +1,283 @@
+{
+  "schema_version": 1,
+  "evidence": {
+    "full_test_comparison": {
+      "path": "evaluation/comparisons/both_baselines_vs_pace_test_set/comparison_report.md",
+      "exists": true
+    },
+    "condition_analysis_script": {
+      "path": "evaluation/condition_analysis.py",
+      "exists": true
+    },
+    "condition_analysis_instructions": {
+      "path": "evaluation/READ_CONDITION_ANALYSIS.md",
+      "exists": true
+    },
+    "artifact_manifest": {
+      "path": "reports/refactor/phase6_artifact_manifest.json",
+      "exists": true
+    },
+    "experiment_inventory": {
+      "path": "reports/refactor/phase6_experiment_inventory",
+      "exists": true
+    }
+  },
+  "condition_related_files": [
+    "evaluation/READ_CONDITION_ANALYSIS.md",
+    "evaluation/results/phase2_inference_validation/figures/metrics/degradation_transfer_ratio_by_condition.png",
+    "evaluation/results/phase2_inference_validation/figures/metrics/edge_f1_by_condition.png",
+    "evaluation/results/phase2_inference_validation/figures/metrics/qabf_by_condition.png",
+    "evaluation/results/phase4_inference_validation_v2/figures/metrics/degradation_transfer_ratio_by_condition.png",
+    "evaluation/results/phase4_inference_validation_v2/figures/metrics/edge_f1_by_condition.png",
+    "evaluation/results/phase4_inference_validation_v2/figures/metrics/qabf_by_condition.png",
+    "evaluation/results/phase5_explicit_hooks/figures/metrics/degradation_transfer_ratio_by_condition.png",
+    "evaluation/results/phase5_explicit_hooks/figures/metrics/edge_f1_by_condition.png",
+    "evaluation/results/phase5_explicit_hooks/figures/metrics/qabf_by_condition.png",
+    "evaluation/results/pre_refactor_smoke/figures/metrics/degradation_transfer_ratio_by_condition.png",
+    "evaluation/results/pre_refactor_smoke/figures/metrics/edge_f1_by_condition.png",
+    "evaluation/results/pre_refactor_smoke/figures/metrics/qabf_by_condition.png"
+  ],
+  "cleanup_candidates": [
+    {
+      "path": "PACE-phase2-step2-tests.zip",
+      "bytes": 2141,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-phase2-step3-tests.zip",
+      "bytes": 1969,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-phase2-tests-initial.zip",
+      "bytes": 2831,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-phase3-step1-additive.zip",
+      "bytes": 3530,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-phase3-step2-import-migration.zip",
+      "bytes": 1283,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-phase3-step3-additive.zip",
+      "bytes": 2237,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-phase3-step4-import-migration.zip",
+      "bytes": 1987,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-phase4-final-bundle.zip",
+      "bytes": 3157,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-phase4-step1-inventory.zip",
+      "bytes": 1566,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-phase4-step2-model-imports.zip",
+      "bytes": 2893,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-phase4-step3-pretrained-compatibility.zip",
+      "bytes": 1733,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-phase4-step4-inference-imports.zip",
+      "bytes": 1528,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-phase4-step5-training-inventory.zip",
+      "bytes": 1889,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-phase4-step6-training-entrypoints.zip",
+      "bytes": 2829,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-phase5-batch1-evaluation-guard.zip",
+      "bytes": 3191,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-phase5-batch2-explicit-hooks.zip",
+      "bytes": 3027,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-phase5-final-bundle.zip",
+      "bytes": 4762,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-phase6-batch1.zip",
+      "bytes": 4549,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-phase6-batch2.zip",
+      "bytes": 2744,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-phase6-batch3.zip",
+      "bytes": 3709,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "PACE-source.zip",
+      "bytes": 679027196,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "README-phase4-2.md",
+      "bytes": 729,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "README-phase4-3.md",
+      "bytes": 872,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "README-phase4-4.md",
+      "bytes": 1236,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "README-phase4-6.md",
+      "bytes": 1097,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "README-phase4-final.md",
+      "bytes": 1427,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "README-phase5-batch1.md",
+      "bytes": 1354,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "README-phase6-batch1.md",
+      "bytes": 585,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "README-phase6-batch2.md",
+      "bytes": 1045,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "README-phase6-batch3.md",
+      "bytes": 1363,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "README-step3.md",
+      "bytes": 640,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "apply_phase4_4.py",
+      "bytes": 1514,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "apply_phase5_batch2.py",
+      "bytes": 4236,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "baseline/CrossFuse/evaluate.py.phase5.bak",
+      "bytes": 20723,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "baseline/CrossFuse/images/21_pairs_tno.zip",
+      "bytes": 5527567,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "baseline/CrossFuse/images/40_vot_tno.zip",
+      "bytes": 12519580,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "baseline/CrossFuse/images/M3FD_Fusion.zip",
+      "bytes": 70913234,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "baseline/CrossFuse/output/crossfuse_test.zip",
+      "bytes": 3331010,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "evaluation/crossfuse_e2e.py.phase5.bak",
+      "bytes": 1078,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "evaluation/pace_e2e.py.phase5.bak",
+      "bytes": 2116,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "inventory_training.py",
+      "bytes": 2708,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "pace/evaluate.py.phase5.bak",
+      "bytes": 36051,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "processed_dataset_full.zip",
+      "bytes": 7322474086,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "prototyping/quality_estimator/features.zip",
+      "bytes": 33906219035,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "prototyping/selective_fusion/inference.py.phase4_4.bak",
+      "bytes": 17147,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "prototyping/synthetic_data_degradation/build_dataset.py.phase3-step4.bak",
+      "bytes": 38774,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "realistic_degraded_test_processed_dataset.zip",
+      "bytes": 3022428736,
+      "reason": "possible temporary file; review manually"
+    },
+    {
+      "path": "tests/test_evaluation_regression.py.phase5.bak",
+      "bytes": 1806,
+      "reason": "possible temporary file; review manually"
+    }
+  ],
+  "warning": "Candidates are informational only. Do not delete without reviewing references and Git tracking."
+}
