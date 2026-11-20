@@ -1,0 +1,53 @@
+[
+  {
+    "name": "network.0.weight",
+    "shape": [
+      16,
+      2,
+      1,
+      1
+    ],
+    "dtype": "torch.float32"
+  },
+  {
+    "name": "network.0.bias",
+    "shape": [
+      16
+    ],
+    "dtype": "torch.float32"
+  },
+  {
+    "name": "network.2.weight",
+    "shape": [
+      16,
+      16,
+      1,
+      1
+    ],
+    "dtype": "torch.float32"
+  },
+  {
+    "name": "network.2.bias",
+    "shape": [
+      16
+    ],
+    "dtype": "torch.float32"
+  },
+  {
+    "name": "network.4.weight",
+    "shape": [
+      1,
+      16,
+      1,
+      1
+    ],
+    "dtype": "torch.float32"
+  },
+  {
+    "name": "network.4.bias",
+    "shape": [
+      1
+    ],
+    "dtype": "torch.float32"
+  }
+]

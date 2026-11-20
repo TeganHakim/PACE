@@ -1,0 +1,53 @@
+[
+  {
+    "name": "features.0.weight",
+    "shape": [
+      64,
+      132,
+      3,
+      3
+    ],
+    "dtype": "torch.float32"
+  },
+  {
+    "name": "features.0.bias",
+    "shape": [
+      64
+    ],
+    "dtype": "torch.float32"
+  },
+  {
+    "name": "features.2.weight",
+    "shape": [
+      32,
+      64,
+      3,
+      3
+    ],
+    "dtype": "torch.float32"
+  },
+  {
+    "name": "features.2.bias",
+    "shape": [
+      32
+    ],
+    "dtype": "torch.float32"
+  },
+  {
+    "name": "features.4.weight",
+    "shape": [
+      1,
+      32,
+      1,
+      1
+    ],
+    "dtype": "torch.float32"
+  },
+  {
+    "name": "features.4.bias",
+    "shape": [
+      1
+    ],
+    "dtype": "torch.float32"
+  }
+]
