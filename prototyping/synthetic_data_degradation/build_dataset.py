@@ -28,9 +28,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from degradation import generate_mask, apply_degradation
+from pace.data.degradation import generate_mask, apply_degradation
 
-from lighting import compute_rgb_baseline_quality
+from pace.data.lighting import compute_rgb_baseline_quality
 
 # Allow direct execution: python prototyping/synthetic_data_degradation/build_dataset.py
 # while importing the canonical implementation from the repository package.
