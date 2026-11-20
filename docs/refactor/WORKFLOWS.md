@@ -31,6 +31,23 @@ python evaluation/eval_metrics.py \
 
 Use `--device cuda` only on a CUDA-enabled system, or `--device cpu` for CPU testing. For a full run use `--max-samples 0` with adequate disk, memory and time.
 
+## Full Jetson Evaluation
+
+For final evaluation on the NVIDIA Jetson, use the staged procedure in
+[Phase 8 Acceptance and Partner Handoff](PHASE8_ACCEPTANCE.md#84-jetson-partner-handoff).
+
+The workflow includes:
+
+1. Three-sample CUDA smoke test
+2. Full evaluation of PACE, CrossFuse, and Addition
+3. Generation of updated evaluation metrics and figures
+4. Condition-specific analysis
+
+Use `--max-samples 0` to evaluate all available samples in the selected dataset.
+
+Save new results in separate output directories and preserve historical
+comparison artifacts for reproducibility.
+
 ## Scientific regression
 Compare against a **locally retained** Phase 4 reference:
 
