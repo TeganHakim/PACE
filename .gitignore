@@ -237,6 +237,7 @@ prototyping/quality_estimator/features.zip
 # evaluation results too big to be stored in git
 pace/evaluation/
 pace/visualize_one_image_pace/
+pace/visualize_one_image_pace_realistic_degraded_v2/
 baseline/CrossFuse/evaluation/
 baseline/Addition/evaluation/
 evaluation/results/

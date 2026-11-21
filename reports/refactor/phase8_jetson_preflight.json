@@ -1,0 +1,22 @@
+{
+  "platform": "Linux-6.8.12-1021-tegra-aarch64-with-glibc2.39",
+  "machine": "aarch64",
+  "python": "3.12.15",
+  "torch": "2.14.1+cu132",
+  "cuda_build": "13.2",
+  "cuda_available": true,
+  "mps_available": false,
+  "checkpoints": {
+    "crossfuse": true,
+    "quality_rgb": true,
+    "quality_ir": true,
+    "reliability_gate": true
+  },
+  "cuda_device": "NVIDIA Thor",
+  "cuda_capability": [
+    11,
+    0
+  ],
+  "cuda_tensor_smoke": true,
+  "errors": []
+}

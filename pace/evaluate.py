@@ -35,7 +35,7 @@ SELECTIVE_ROOT = REPO / 'prototyping' / 'selective_fusion'
 sys.path.insert(0, str(CROSSFUSE_ROOT))
 sys.path.insert(0, str(SELECTIVE_ROOT))
 sys.path.insert(0, str(PACE_ROOT))
-from inference import load_models, load_image, load_quality_image, predict_quality, samples, choose_device
+from inference import load_models, load_image, load_quality_image, predict_quality_from_deep_features, samples, choose_device
 from local_crossfuse import LocalCrossFuse
 from train_conv_trans import CLASS_TO_ID, ID_TO_CLASS, load_targets, targets_to_metric_format, calculate_metrics
 
@@ -144,20 +144,11 @@ def prepare_sample(encoders, estimators, scales, gate_model, rgb, ir, rgb_origin
     passed into LocalCrossFuse to avoid re-encoding the images.
 
     """
-    rgb_shallow_original, rgb_deep_original = encoders["rgb"](rgb_original * 255.0)
-    ir_shallow_original, ir_deep_original = encoders["ir"](ir_original * 255.0)
-
-    # Use original sized features for quality estimation and gate
-    rgb_quality = predict_quality(estimators["rgb"], scales["rgb"], rgb_original, rgb_deep_original)
-    ir_quality = predict_quality(estimators["ir"], scales["ir"], ir_original, ir_deep_original)
+    rgb_shallow, rgb_deep = encoders['rgb'](rgb * 255.0)
+    ir_shallow, ir_deep = encoders['ir'](ir * 255.0)
+    rgb_quality = predict_quality_from_deep_features(rgb_deep, estimators['rgb'], scales['rgb'], rgb)
+    ir_quality = predict_quality_from_deep_features(ir_deep, estimators['ir'], scales['ir'], ir)
     gate = gate_model(rgb_quality, ir_quality)
-
-    # Use resized (interpolated) features for fusion
-    rgb_shallow = F.interpolate(rgb_shallow_original, size=(256, 256), mode="bilinear", align_corners=False)
-    rgb_deep = F.interpolate(rgb_deep_original, size=(32, 32), mode="bilinear", align_corners=False)
-    ir_shallow = F.interpolate(ir_shallow_original, size=(256, 256), mode="bilinear", align_corners=False)
-    ir_deep = F.interpolate(ir_deep_original, size=(32, 32), mode="bilinear", align_corners=False)
-
     encoded_features = (rgb_shallow, rgb_deep, ir_shallow, ir_deep)
     return {'rgb_quality': rgb_quality, 'ir_quality': ir_quality, 'gate': gate, 'encoded_features': encoded_features}
 

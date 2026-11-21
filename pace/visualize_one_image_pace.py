@@ -372,88 +372,17 @@ def prepare_sample(
     Encode the resized inputs once and reuse those deep features for
     quality estimation. This matches the current 256x256 inference path.
     """
-    # rgb_shallow_original, rgb_deep_original = encoders["rgb"](rgb_original * 255.0)
-    # ir_shallow_original, ir_deep_original = encoders["ir"](ir_original * 255.0)
 
-    # rgb_quality = predict_quality(
-    #     estimators["rgb"],
-    #     scales["rgb"],
-    #     rgb_original,
-    #     rgb_deep_original,
-    # )
-
-    # # Resize features for the existing fusion architecture.
-    # rgb_shallow = F.interpolate(
-    #     rgb_shallow_original,
-    #     size=(256, 256),
-    #     mode="bilinear",
-    #     align_corners=False,
-    # )
-
-    # rgb_deep = F.interpolate(
-    #     rgb_deep_original,
-    #     size=(32, 32),
-    #     mode="bilinear",
-    #     align_corners=False,
-    # )
-
-    # ir_quality = predict_quality(
-    #     estimators["ir"],
-    #     scales["ir"],
-    #     ir_original,
-    #     ir_deep_original,
-    # )
-
-    # ir_shallow = F.interpolate(
-    #     ir_shallow_original,
-    #     size=(256, 256),
-    #     mode="bilinear",
-    #     align_corners=False,
-    # )
-
-    # ir_deep = F.interpolate(
-    #     ir_deep_original,
-    #     size=(32, 32),
-    #     mode="bilinear",
-    #     align_corners=False,
-    # )
-
-    # rgb_quality = predict_quality_from_original(
-    #     encoders["rgb"],
-    #     estimators["rgb"],
-    #     scales["rgb"],
-    #     rgb_original,
-    # )
-
-    # ir_quality = predict_quality_from_original(
-    #     encoders["ir"],
-    #     estimators["ir"],
-    #     scales["ir"],
-    #     ir_original,
-    # )
-
-    # rgb_shallow, rgb_deep = encoders["rgb"](rgb * 255.0)
-    # ir_shallow, ir_deep = encoders["ir"](ir * 255.0)
-
-    # rgb_quality = predict_quality_from_deep_features(
-    #     rgb_deep,
-    #     estimators["rgb"],
-    #     scales["rgb"],
-    #     rgb,
-    # )
-
-    # ir_quality = predict_quality_from_deep_features(
-    #     ir_deep,
-    #     estimators["ir"],
-    #     scales["ir"],
-    #     ir,
-    # )
+    # rgb_shallow, rgb_deep = encoders['rgb'](rgb * 255.0)
+    # ir_shallow, ir_deep = encoders['ir'](ir * 255.0)
+    # rgb_quality = predict_quality_from_original(encoders['rgb'], estimators['rgb'], scales['rgb'], rgb_original)
+    # ir_quality = predict_quality_from_original(encoders['ir'], estimators['ir'], scales['ir'], ir_original)
+    # gate = gate_model(rgb_quality, ir_quality)
 
     rgb_shallow, rgb_deep = encoders['rgb'](rgb * 255.0)
     ir_shallow, ir_deep = encoders['ir'](ir * 255.0)
-    rgb_quality = predict_quality_from_original(encoders['rgb'], estimators['rgb'], scales['rgb'], rgb_original)
-    ir_quality = predict_quality_from_original(encoders['ir'], estimators['ir'], scales['ir'], ir_original)
-
+    rgb_quality = predict_quality_from_deep_features(rgb_deep, estimators['rgb'], scales['rgb'], rgb)
+    ir_quality = predict_quality_from_deep_features(ir_deep, estimators['ir'], scales['ir'], ir)
     gate = gate_model(rgb_quality, ir_quality)
 
     expected_quality_shape = (1, 1, 8, 8)

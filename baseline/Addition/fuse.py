@@ -46,7 +46,7 @@ def read_gray(path, size):
         raise FileNotFoundError(path)
 
     return cv2.resize(
-        image, (size, size), interpolation=cv2.INTER_LINEAR
+        image, (size, size), interpolation=cv2.INTER_AREA
     )
 
 

@@ -168,7 +168,7 @@ def load_models(
                 / "prototyping"
                 / "quality_estimator"
                 / "checkpoints"
-                / f"quality_{modality}.pt"
+                / f"quality_{modality}_256.pt"
             )
 
             weights, metadata = state(path, device)
