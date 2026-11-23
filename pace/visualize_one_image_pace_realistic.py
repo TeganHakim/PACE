@@ -9,9 +9,9 @@ Dataset selection matches evaluation/common.py selected_ids():
     - use metadata.csv for degradation metadata
 
 Run from the repository root:
-    python pace/visualize_one_image_realistic_degraded.py
-    python pace/visualize_one_image_realistic_degraded.py --sample-id 00315
-    python pace/visualize_one_image_realistic_degraded.py --sample-index 25
+    python pace/visualize_one_image_pace_realistic.py
+    python pace/visualize_one_image_pace_realistic.py --sample-id 00315
+    python pace/visualize_one_image_pace_realistic.py --sample-index 25
 
 The quality estimators use the 256x256 pipeline and checkpoints:
     quality_rgb_256.pt
@@ -19,6 +19,9 @@ The quality estimators use the 256x256 pipeline and checkpoints:
 
 Outputs:
     pace/visualize_one_image_pace_realistic_degraded_v2/<sample-id>/
+
+The model and detector operate on grayscale images. For visualization,
+PACE's fused luminance is combined with the original RGB chrominance.
 """
 
 import argparse
@@ -31,6 +34,7 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+import cv2
 from matplotlib.patches import Patch, Rectangle
 import numpy as np
 import torch
@@ -71,6 +75,8 @@ from inference import (
     load_encoder,
     load_image,
     predict_quality_from_deep_features,
+    predict_quality_from_original,
+    load_quality_image,
 )
 from train_conv_trans import CLASS_TO_ID, ID_TO_CLASS, load_targets
 
@@ -413,28 +419,35 @@ def prepare_sample(
     gate_model,
     rgb,
     ir,
+    rgb_original,
+    ir_original
 ):
     """
     Both quality estimators were trained on 256x256 images.
     Encode the resized RGB/IR tensors and use those same deep features
     for quality prediction and fusion.
     """
-    rgb_shallow, rgb_deep = encoders["rgb"](rgb * 255.0)
-    ir_shallow, ir_deep = encoders["ir"](ir * 255.0)
+    # rgb_shallow, rgb_deep = encoders["rgb"](rgb * 255.0)
+    # ir_shallow, ir_deep = encoders["ir"](ir * 255.0)
 
-    rgb_quality = predict_quality_from_deep_features(
-        rgb_deep,
-        estimators["rgb"],
-        scales["rgb"],
-        rgb,
-    )
-    ir_quality = predict_quality_from_deep_features(
-        ir_deep,
-        estimators["ir"],
-        scales["ir"],
-        ir,
-    )
+    # rgb_quality = predict_quality_from_deep_features(
+    #     rgb_deep,
+    #     estimators["rgb"],
+    #     scales["rgb"],
+    #     rgb,
+    # )
+    # ir_quality = predict_quality_from_deep_features(
+    #     ir_deep,
+    #     estimators["ir"],
+    #     scales["ir"],
+    #     ir,
+    # )
 
+    # gate = gate_model(rgb_quality, ir_quality)
+    rgb_shallow, rgb_deep = encoders['rgb'](rgb * 255.0)
+    ir_shallow, ir_deep = encoders['ir'](ir * 255.0)
+    rgb_quality = predict_quality_from_original(encoders['rgb'], estimators['rgb'], scales['rgb'], rgb_original)
+    ir_quality = predict_quality_from_original(encoders['ir'], estimators['ir'], scales['ir'], ir_original)
     gate = gate_model(rgb_quality, ir_quality)
 
     expected_shape = (1, 1, 8, 8)
@@ -537,6 +550,65 @@ def tensor_image(tensor):
         tensor.detach().float().cpu()[0, 0]
         .clamp(0, 1).numpy()
     )
+
+
+def load_rgb_display(path, width, height):
+    """
+    Load the visible RGB image for visualization only.
+
+    The PACE network still receives the existing grayscale tensor.
+    """
+    bgr = cv2.imread(str(path), cv2.IMREAD_COLOR)
+    if bgr is None:
+        raise FileNotFoundError("Could not read RGB image: {}".format(path))
+
+    bgr = cv2.resize(
+        bgr, (width, height), interpolation=cv2.INTER_AREA
+    )
+    rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+    return rgb.astype(np.float32) / 255.0
+
+
+def restore_rgb_chroma(rgb_image, fused_luminance):
+    """
+    Create a color visualization from PACE's grayscale fused output.
+
+    PACE supplies the Y (luminance) channel. Cb/Cr chrominance comes
+    from the original visible RGB image, following the color-output
+    approach used by the original CrossFuse implementation.
+
+    This does not change the tensor used by the detector.
+    """
+    if rgb_image.ndim != 3 or rgb_image.shape[2] != 3:
+        raise ValueError(
+            "Expected RGB display image [H,W,3], got {}".format(
+                rgb_image.shape
+            )
+        )
+    if fused_luminance.ndim != 2:
+        raise ValueError(
+            "Expected fused luminance [H,W], got {}".format(
+                fused_luminance.shape
+            )
+        )
+    if rgb_image.shape[:2] != fused_luminance.shape:
+        raise ValueError(
+            "RGB and fused dimensions differ: {} vs {}".format(
+                rgb_image.shape[:2], fused_luminance.shape
+            )
+        )
+
+    rgb_u8 = np.clip(
+        np.rint(rgb_image * 255.0), 0, 255
+    ).astype(np.uint8)
+    ycrcb = cv2.cvtColor(rgb_u8, cv2.COLOR_RGB2YCrCb)
+
+    ycrcb[:, :, 0] = np.clip(
+        np.rint(fused_luminance * 255.0), 0, 255
+    ).astype(np.uint8)
+
+    fused_rgb = cv2.cvtColor(ycrcb, cv2.COLOR_YCrCb2RGB)
+    return fused_rgb.astype(np.float32) / 255.0
 
 
 def tensor_map(tensor, name):
@@ -771,8 +843,11 @@ def plot_detection_comparison(
     fig, axes = plt.subplots(1, 3, figsize=(17, 6))
 
     for ax, (title, image, prediction) in zip(axes, panels):
-        height, width = image.shape
-        ax.imshow(image, cmap="gray", vmin=0, vmax=1)
+        height, width = image.shape[:2]
+        if image.ndim == 2:
+            ax.imshow(image, cmap="gray", vmin=0, vmax=1)
+        else:
+            ax.imshow(np.clip(image, 0, 1))
         draw_ground_truth(ax, targets, width, height)
         draw_predictions(ax, prediction, confidence)
         count = int(
@@ -812,18 +887,18 @@ def plot_detection_comparison(
 
 
 def plot_pace_ground_truth(fused, prediction, targets, confidence, sample_id, out):
-    height, width = fused.shape
+    height, width = fused.shape[:2]
     fig, axes = plt.subplots(1, 3, figsize=(16, 5.5))
 
-    axes[0].imshow(fused, cmap="gray", vmin=0, vmax=1)
+    axes[0].imshow(np.clip(fused, 0, 1))
     draw_ground_truth(axes[0], targets, width, height)
     axes[0].set_title("Ground-truth annotations")
 
-    axes[1].imshow(fused, cmap="gray", vmin=0, vmax=1)
+    axes[1].imshow(np.clip(fused, 0, 1))
     draw_predictions(axes[1], prediction, confidence)
     axes[1].set_title("PACE predicted detections")
 
-    axes[2].imshow(fused, cmap="gray", vmin=0, vmax=1)
+    axes[2].imshow(np.clip(fused, 0, 1))
     draw_ground_truth(axes[2], targets, width, height)
     draw_predictions(axes[2], prediction, confidence)
     axes[2].set_title("Ground truth + PACE predictions")
@@ -915,6 +990,16 @@ def main():
     detector = load_detector(args.detector_weights, device)
 
     # Both modalities are loaded as grayscale 256x256 tensors in [0,1].
+    rgb_original = load_quality_image(
+        rgb_path,
+        "rgb",
+        device,
+    )
+    ir_original = load_quality_image(
+        ir_path,
+        "ir",
+        device,
+    )
     rgb = load_image(rgb_path, device)
     ir = load_image(ir_path, device)
 
@@ -940,6 +1025,9 @@ def main():
             gate_model,
             rgb,
             ir,
+            rgb_original,
+            ir_original
+
         )
 
         fused = run_pace(
@@ -963,9 +1051,16 @@ def main():
             args.nms_confidence, args.nms_iou,
         )
 
-    rgb_image = tensor_image(rgb)
+    # Keep the model/detector inputs grayscale, but retain the visible
+    # RGB chrominance for color visualization of the fused result.
     ir_image = tensor_image(ir)
     fused_image = tensor_image(fused)
+    rgb_image = load_rgb_display(
+        rgb_path, width=rgb.shape[-1], height=rgb.shape[-2]
+    )
+    fused_color_image = restore_rgb_chroma(
+        rgb_image, fused_image
+    )
     rgb_quality = tensor_map(prepared["rgb_quality"], "RGB quality")
     ir_quality = tensor_map(prepared["ir_quality"], "IR quality")
     gate = tensor_map(prepared["gate"], "Reliability gate")
@@ -973,7 +1068,16 @@ def main():
     np.save(output_dir / "rgb_quality_map.npy", rgb_quality)
     np.save(output_dir / "ir_quality_map.npy", ir_quality)
     np.save(output_dir / "reliability_gate.npy", gate)
+    # Preserve the grayscale model output for reproducibility and
+    # detector evaluation; save the color-restored visualization too.
     np.save(output_dir / "fused_image.npy", fused_image)
+    np.save(
+        output_dir / "fused_color_image.npy", fused_color_image
+    )
+    plt.imsave(
+        output_dir / "fused_color_image.png",
+        np.clip(fused_color_image, 0, 1),
+    )
 
     plot_inputs_quality(
         rgb_image, ir_image, rgb_quality, ir_quality,
@@ -987,12 +1091,12 @@ def main():
         gate, rgb_image, ir_image, sample_id, output_dir,
     )
     plot_fusion(
-        rgb_image, ir_image, fused_image, sample_id, output_dir,
+        rgb_image, ir_image, fused_color_image, sample_id, output_dir,
     )
     plot_detection_comparison(
         rgb_image,
         ir_image,
-        fused_image,
+        fused_color_image,
         {
             "rgb": rgb_prediction,
             "ir": ir_prediction,
@@ -1004,7 +1108,7 @@ def main():
         output_dir,
     )
     plot_pace_ground_truth(
-        fused_image,
+        fused_color_image,
         pace_prediction,
         targets,
         args.confidence,

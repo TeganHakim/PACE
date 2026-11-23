@@ -4,7 +4,7 @@ import sys
 from common import ROOT
 
 def main():
-    source=ROOT/'pace/evaluate.py'
+    source=ROOT/'pace/evaluate_color.py'
     sys.path.insert(0,str(source.parent))
     sys.argv=[str(source),*sys.argv[1:],'--paired-jpg-samples','--save-fused']
     runpy.run_path(str(source),run_name='__main__')

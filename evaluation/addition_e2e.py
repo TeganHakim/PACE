@@ -19,8 +19,8 @@ def main() -> None:
     args = parser.parse_args()
     fused = args.output/'fused'
     shared = ('--dataset-root', args.dataset_root, '--split', 'test', '--max-samples', args.max_samples)
-    command(ROOT/'baseline'/'Addition'/'fuse.py', *shared, '--output', fused)
-    command(ROOT/'baseline'/'Addition'/'evaluate.py', *shared, '--fused-dir', fused,
+    command(ROOT/'baseline'/'Addition'/'fuse_color.py', *shared, '--output', fused)
+    command(ROOT/'baseline'/'Addition'/'evaluate_color.py', *shared, '--fused-dir', fused,
             '--output', args.output, '--device', args.device, '--visualizations', args.visualizations,
             '--warmup', args.warmup, '--seed', args.seed, '--confidence', args.confidence,
             '--nms-iou', args.nms_iou)
